@@ -13,22 +13,24 @@ async function settled(page: import('@playwright/test').Page) {
     const el = node as HTMLElement;
     const style = getComputedStyle(el);
     return style.visibility !== 'visible' || Number(style.opacity) !== 1 ||
-      ['transform', 'opacity', 'visibility', 'will-change'].some((key) => el.style.getPropertyValue(key));
+      ['transform', 'transform-origin', 'opacity', 'visibility', 'will-change'].some((key) => el.style.getPropertyValue(key));
   }).map((el) => el.outerHTML));
   expect(dirty).toEqual([]);
 }
 
-test('Chrome: every nav element enters once and the footer slowly fades as a whole', async ({ page }) => {
+test('Chrome: brand enters from the left, then links scale in one at a time', async ({ page }) => {
   // Observe rendered frames, not GSAP internals. Start before any app code.
   await page.addInitScript(() => {
-    const frames: { t: number; opacity: number[]; y: number[]; footerY: number; footerPhase: string | undefined }[] = [];
+    const frames: { t: number; opacity: number[]; x: number[]; y: number[]; scale: number[]; footerY: number; footerPhase: string | undefined }[] = [];
     (window as any).__chromeFrames = frames;
     const sample = () => {
       const nodes = Array.from(document.querySelectorAll<HTMLElement>('[data-chrome="header"] [data-chrome-intro], [data-chrome="footer"]'));
       if (nodes.length) frames.push({
         t: performance.now(),
         opacity: nodes.map((el) => getComputedStyle(el).visibility === 'hidden' ? 0 : Number(getComputedStyle(el).opacity)),
+        x: nodes.map((el) => new DOMMatrixReadOnly(getComputedStyle(el).transform).m41),
         y: nodes.map((el) => new DOMMatrixReadOnly(getComputedStyle(el).transform).m42),
+        scale: nodes.map((el) => new DOMMatrixReadOnly(getComputedStyle(el).transform).a),
         footerY: nodes.at(-1)!.getBoundingClientRect().y,
         footerPhase: nodes.at(-1)!.dataset.chromePhase,
       });
@@ -42,12 +44,22 @@ test('Chrome: every nav element enters once and the footer slowly fades as a who
   await expect(page.locator('[data-chrome="header"] .site-nav a[data-chrome-intro]')).toHaveCount(3);
   await expect(page.locator('[data-chrome="footer"] [data-chrome-intro]')).toHaveCount(0);
   await expect.poll(() => page.evaluate(() => (window as any).__chromeFrames.at(-1)?.footerPhase)).toBe('settled');
-  const frames = await page.evaluate(() => (window as any).__chromeFrames) as { t: number; opacity: number[]; y: number[]; footerY: number; footerPhase: string }[];
+  const frames = await page.evaluate(() => (window as any).__chromeFrames) as { t: number; opacity: number[]; x: number[]; y: number[]; scale: number[]; footerY: number; footerPhase: string }[];
   for (let i = 0; i < 5; i++) {
     expect(frames.some((f) => f.opacity[i] > 0.05 && f.opacity[i] < 0.9), `target ${i} must visibly fade`).toBe(true);
-    if (i < 4) expect(frames.some((f) => f.y[i] > 1), `nav target ${i} must travel`).toBe(true);
   }
-  expect(frames.every((f) => f.y[4] === 0), 'footer must only fade').toBe(true);
+  expect(frames.some((f) => f.x[0] < -1), 'brand must enter from the left').toBe(true);
+  expect(frames.every((f) => f.y[0] === 0 && f.scale[0] === 1), 'brand must not rise or scale').toBe(true);
+  for (let i = 1; i < 4; i++) {
+    expect(frames.some((f) => f.scale[i] >= 0.49 && f.scale[i] < 0.95), `link ${i} must scale from 50%`).toBe(true);
+    expect(frames.every((f) => f.x[i] === 0 && f.y[i] === 0), `link ${i} must not travel`).toBe(true);
+  }
+  const starts = [0, 1, 2, 3].map((index) => frames.find((f) => f.opacity[index] > 0.05)!);
+  expect(starts[1].opacity[0], 'links start after the brand finishes').toBeGreaterThan(0.98);
+  expect(starts[1].t - starts[0].t).toBeGreaterThan(300);
+  expect(starts[2].t - starts[1].t).toBeGreaterThan(200);
+  expect(starts[3].t - starts[2].t).toBeGreaterThan(200);
+  expect(frames.every((f) => f.x[4] === 0 && f.y[4] === 0 && f.scale[4] === 1), 'footer must only fade').toBe(true);
   const intro = frames.filter((f) => f.footerPhase === 'intro');
   expect(intro.at(-1)!.t - intro[0].t, 'slow footer fade').toBeGreaterThan(1000);
   expect(Math.max(...frames.map((f) => f.footerY)) - Math.min(...frames.map((f) => f.footerY))).toBeLessThan(1);

@@ -7,29 +7,65 @@ export function mountChromeMotion() {
     for (const root of roots) {
       if (root.dataset.chromePhase !== "initial") continue;
       const footer = root.dataset.chrome === "footer";
-      const targets = footer ? [root] : Array.from(root.querySelectorAll<HTMLElement>("[data-chrome-intro]"));
+      const targets = footer
+        ? [root]
+        : Array.from(root.querySelectorAll<HTMLElement>("[data-chrome-intro]"));
       const settle = () => {
-        gsap.set(targets, { clearProps: "transform,opacity,visibility,willChange" });
+        gsap.set(targets, {
+          clearProps: "transform,transformOrigin,opacity,visibility,willChange",
+        });
         root.dataset.chromePhase = "settled";
       };
+
       // Respect both reduced motion and a pre-paint failsafe that already released.
-      if (matchMedia("(prefers-reduced-motion: reduce)").matches ||
-          document.documentElement.getAttribute("data-motion") !== "js") {
+      if (
+        matchMedia("(prefers-reduced-motion: reduce)").matches ||
+        document.documentElement.getAttribute("data-motion") !== "js"
+      ) {
         root.dataset.chromePhase = "intro";
         settle();
         continue;
       }
-      gsap.set(targets, footer
-        ? { autoAlpha: 0, willChange: "opacity" }
-        : { autoAlpha: 0, y: 16, willChange: "transform,opacity" });
+
       root.dataset.chromePhase = "intro";
-      gsap.to(targets, {
-        autoAlpha: 1,
-        ...(footer ? {} : { y: 0, stagger: { amount: 0.15 } }),
-        duration: footer ? 1.4 : 0.45,
-        ease: "power2.out",
-        onComplete: settle,
+      if (footer) {
+        gsap.set(root, { autoAlpha: 0, willChange: "opacity" });
+        gsap.to(root, {
+          autoAlpha: 1,
+          duration: 1.4,
+          ease: "power2.out",
+          onComplete: settle,
+        });
+        continue;
+      }
+
+      const [brand, ...links] = targets;
+      gsap.set(brand, {
+        autoAlpha: 0,
+        x: -24,
+        willChange: "transform,opacity",
       });
+      gsap.set(links, {
+        autoAlpha: 0,
+        scale: 0.5,
+        transformOrigin: "center",
+        willChange: "transform,opacity",
+      });
+      gsap
+        .timeline({ onComplete: settle })
+        .to(brand, {
+          autoAlpha: 1,
+          x: 0,
+          duration: 0.45,
+          ease: "power2.out",
+        })
+        .to(links, {
+          autoAlpha: 1,
+          scale: 1,
+          duration: 0.28,
+          stagger: 0.28,
+          ease: "back.out(1.4)",
+        });
     }
   });
   return () => {
