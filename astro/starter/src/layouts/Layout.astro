@@ -1,0 +1,56 @@
+---
+import "../styles/global.css";
+
+interface Props {
+  title: string;
+  /** Which nav link is the current page. */
+  current: "home" | "about" | "work";
+}
+
+const { title, current } = Astro.props;
+
+const links = [
+  { key: "home", href: "/", label: "Home" },
+  { key: "about", href: "/about", label: "About" },
+  { key: "work", href: "/work", label: "Work" },
+] as const;
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:," />
+    <title>{title}</title>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="shell">
+        <a class="brand" href="/">Animaxxing</a>
+        <nav class="site-nav" aria-label="Main">
+          {
+            links.map((link) => (
+              <a
+                href={link.href}
+                data-testid={`nav-${link.key}`}
+                aria-current={link.key === current ? "page" : undefined}
+              >
+                {link.label}
+              </a>
+            ))
+          }
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <slot />
+    </main>
+
+    <footer class="site-footer">
+      <div class="shell">
+        <p>&copy; 2025 Animaxxing. Built to be read first.</p>
+      </div>
+    </footer>
+  </body>
+</html>

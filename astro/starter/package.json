@@ -1,0 +1,14 @@
+{
+  "name": "astro-starter",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview --port 3101 --host 127.0.0.1"
+  },
+  "dependencies": {
+    "astro": "^5.18.2",
+    "gsap": "^3.13.0"
+  }
+}

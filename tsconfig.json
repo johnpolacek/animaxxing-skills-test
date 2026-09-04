@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "types": [
+      "node"
+    ]
+  },
+  "include": [
+    "shared",
+    "vanilla/tests",
+    "nextjs/tests",
+    "astro/tests",
+    "sveltekit/tests",
+    "nuxt/tests",
+    "react-router/tests",
+    "tanstack/tests",
+    "vanilla/playwright.config.ts",
+    "nextjs/playwright.config.ts",
+    "astro/playwright.config.ts",
+    "sveltekit/playwright.config.ts",
+    "nuxt/playwright.config.ts",
+    "react-router/playwright.config.ts",
+    "tanstack/playwright.config.ts"
+  ]
+}

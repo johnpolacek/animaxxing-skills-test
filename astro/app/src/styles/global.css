@@ -1,0 +1,163 @@
+:root {
+  --ink: #16161a;
+  --ink-soft: #56565e;
+  --paper: #fbfaf8;
+  --rule: #e2ded6;
+  --accent: #6b4bd6;
+  --measure: 62ch;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 16px/1.65 "Iowan Old Style", Georgia, "Times New Roman", serif;
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+}
+
+a {
+  color: var(--accent);
+}
+
+.shell {
+  width: min(100% - 3rem, 68rem);
+  margin-inline: auto;
+}
+
+/* Header ------------------------------------------------------------------ */
+
+.site-header {
+  border-bottom: 1px solid var(--rule);
+}
+
+.site-header .shell {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2rem;
+  padding-block: 1.25rem;
+}
+
+.brand {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.site-nav {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.site-nav a {
+  color: var(--ink-soft);
+  text-decoration: none;
+  padding-bottom: 2px;
+  border-bottom: 1px solid transparent;
+}
+
+.site-nav a:hover,
+.site-nav a:focus-visible,
+.site-nav a[aria-current="page"] {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+}
+
+/* Page -------------------------------------------------------------------- */
+
+main {
+  flex: 1;
+}
+
+.page {
+  max-width: var(--measure);
+  padding-block: 4.5rem 6rem;
+}
+
+.page h1 {
+  font-size: clamp(2.1rem, 6vw, 3.1rem);
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  margin: 0 0 1.75rem;
+}
+
+.page p {
+  margin: 0 0 1.35rem;
+}
+
+.page p:last-child {
+  margin-bottom: 0;
+}
+
+/* Footer ------------------------------------------------------------------ */
+
+.site-footer {
+  border-top: 1px solid var(--rule);
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+}
+
+.site-footer .shell {
+  padding-block: 1.5rem;
+}
+
+.site-footer p {
+  margin: 0;
+}
+
+/* Lifecycle --------------------------------------------------------------- */
+
+/*
+ * Pre-paint initial state.
+ *
+ * Scoped to the mark the inline head script sets and to the page's own initial
+ * phase, so it releases the instant the controller takes over and never applies
+ * at all without JavaScript or under reduced motion. `visibility` keeps the
+ * layout box, so nothing shifts when the intro reveals the content.
+ */
+html[data-motion="js"] [data-page][data-phase="initial"] [data-intro] {
+  visibility: hidden;
+}
+
+/* At its end state a page is still laid out, just no longer interactive. */
+[data-page][data-phase="end"] {
+  pointer-events: none;
+}
+
+/* A running view transition must not swallow a click meant for the page. */
+::view-transition {
+  pointer-events: none;
+}
+
+[data-page]:focus {
+  outline: none;
+}
+
+[data-page]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 6px;
+}
+
+/* Only the initial document hides chrome; page transitions never target it. */
+html[data-motion="js"] [data-chrome="header"][data-chrome-phase="initial"] [data-chrome-intro],
+html[data-motion="js"] [data-chrome="footer"][data-chrome-phase="initial"] {
+  visibility: hidden;
+}
+
+[data-chrome="header"] [data-chrome-intro] {
+  display: inline-block;
+}

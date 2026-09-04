@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:," />
+    %sveltekit.head%
+  </head>
+  <body data-sveltekit-preload-data="hover">
+    <script>
+      /*
+       * Marks the document as JavaScript-animated before anything paints.
+       *
+       * The rule in app.css is scoped to this mark and to a page's `initial`
+       * phase, so server-rendered content is fully visible without JavaScript
+       * and hides only while a controller is about to take over.
+       *
+       * First in <body> so it runs before any route content is parsed. The
+       * attribute names are the ones in $lib/motion/phases.ts; an inline
+       * script cannot import them.
+       */
+      (function () {
+        var root = document.documentElement;
+        // Reduced motion paints settled. There is no travel to hide for.
+        if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+          return;
+        }
+        root.setAttribute("data-motion", "js");
+        /*
+         * The failsafe for the case the mark cannot cover: the document
+         * arrives, this script runs, and the bundle then never does. Releasing
+         * the mark puts the page back to its no-JavaScript state rather than
+         * leaving content hidden behind a lifecycle that will never start. A
+         * controller that does arrive sets data-motion-live first.
+         */
+        setTimeout(function () {
+          if (!root.hasAttribute("data-motion-live")) root.removeAttribute("data-motion");
+        }, 900);
+      })();
+    </script>
+    <div style="display: contents">%sveltekit.body%</div>
+  </body>
+</html>

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Work — Animaxxing</title>
+
+    <script>
+      /*
+        Pre-paint mark. Runs before any content is parsed, so the CSS rule in
+        styles.css can hide intro targets during the initial phase without ever
+        hiding them from a reader who has no JavaScript. Under reduced motion
+        the mark is skipped entirely and the page paints settled.
+      */
+      (function () {
+        var root = document.documentElement;
+        try {
+          if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+        } catch (e) {}
+        root.setAttribute("data-motion", "js");
+        // If the module never runs, release the rule rather than trap the page
+        // behind a mark nothing will clear.
+        var release = function () {
+          if (!root.hasAttribute("data-motion-live")) {
+            root.removeAttribute("data-motion");
+          }
+        };
+        window.addEventListener("load", release);
+        window.setTimeout(release, 1300);
+      })();
+    </script>
+    <link rel="stylesheet" href="/src/styles.css" />
+    <script type="module" src="/src/main.ts"></script>
+  </head>
+  <body>
+    <header class="site-header" data-chrome="header" data-chrome-phase="initial">
+      <div class="shell">
+        <a class="brand" data-chrome-intro="" href="/">Animaxxing</a>
+        <nav class="site-nav" aria-label="Main">
+          <a data-chrome-intro="" data-testid="nav-home" href="/">Home</a>
+          <a data-chrome-intro="" data-testid="nav-about" href="/about/">About</a>
+          <a data-chrome-intro="" data-testid="nav-work" href="/work/" aria-current="page">Work</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <article class="page shell" data-page="work" data-phase="initial">
+        <h1 data-intro>Selected work</h1>
+        <p data-intro>A reading app for a national archive, where every transition had to survive a slow connection and a screen reader. An events site with a booking flow that never once moved a button out from under a thumb.</p>
+        <p data-intro>A documentation platform whose search results animate in but stay copyable the whole time. A gallery whose images reserve their space long before they arrive.</p>
+        <p data-intro>The through line is restraint. If the motion cannot explain itself in a sentence, it does not ship.</p>
+      </article>
+    </main>
+
+    <footer class="site-footer" data-chrome="footer" data-chrome-phase="initial" data-chrome-intro="">
+      <div class="shell">
+        <p>&copy; <span data-year>2025</span> Animaxxing. Built to be read first.</p>
+      </div>
+    </footer>
+  </body>
+</html>

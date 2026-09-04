@@ -1,0 +1,106 @@
+---
+import { ClientRouter } from "astro:transitions";
+import "../styles/global.css";
+
+interface Props {
+  title: string;
+  /** Which nav link is the current page. */
+  current: "home" | "about" | "work";
+}
+
+const { title, current } = Astro.props;
+
+const links = [
+  { key: "home", href: "/", label: "Home" },
+  { key: "about", href: "/about", label: "About" },
+  { key: "work", href: "/work", label: "Work" },
+] as const;
+---
+
+<!--
+  GSAP owns the page transition, so the browser must not also crossfade the
+  root. `transition:animate="none"` compiles to no animation on old, new, and
+  group for the `root` name, so the new body appears at the swap holding its
+  initial state and the outro's end state is the last thing seen before it.
+-->
+<html lang="en" transition:name="root" transition:animate="none">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:," />
+
+    <script is:inline>
+      /*
+        Pre-paint mark. This runs before any content is parsed, so the rule in
+        global.css can hide intro targets during the initial phase without ever
+        hiding them from a reader who has no JavaScript. Under reduced motion
+        the mark is skipped entirely and the page paints settled.
+
+        Kept tiny and inline so it cannot fail separately from the CSS it
+        governs, and guarded on `window` because the router keeps the document
+        alive across navigations.
+
+        Failsafe: if the module bundle never runs, release the mark rather than
+        trap the page behind a rule nothing will clear. `data-motion-live` is
+        the module saying it is here; the timeout is well inside the second and
+        a half a reader should ever wait to read.
+      */
+      (function () {
+        if (window.__animaxxMark) return;
+        window.__animaxxMark = true;
+        var root = document.documentElement;
+        try {
+          if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+        } catch (e) {}
+        root.setAttribute("data-motion", "js");
+        var release = function () {
+          if (!root.hasAttribute("data-motion-live")) root.removeAttribute("data-motion");
+        };
+        window.addEventListener("load", release);
+        window.setTimeout(release, 1300);
+      })();
+    </script>
+
+    <ClientRouter />
+    <title>{title}</title>
+  </head>
+  <body>
+    <header class="site-header" transition:persist="site-header" transition:animate="none" data-chrome="header" data-chrome-phase="initial">
+      <div class="shell">
+        <a class="brand" data-chrome-intro="" href="/">Animaxxing</a>
+        <nav class="site-nav" aria-label="Main">
+          {
+            links.map((link) => (
+              <a
+                href={link.href}
+                data-chrome-intro="" data-testid={`nav-${link.key}`}
+                aria-current={link.key === current ? "page" : undefined}
+              >
+                {link.label}
+              </a>
+            ))
+          }
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <slot />
+    </main>
+
+    <footer class="site-footer" transition:persist="site-footer" transition:animate="none" data-chrome="footer" data-chrome-phase="initial" data-chrome-intro="">
+      <div class="shell">
+        <p>&copy; 2025 Animaxxing. Built to be read first.</p>
+      </div>
+    </footer>
+
+    <!--
+      One layout-level module owns the transition. It registers the router
+      listeners on its single execution per visit; nothing lifecycle-related
+      lives in a page script.
+    -->
+    <script>
+      import "../motion/router";
+    </script>
+  </body>
+</html>

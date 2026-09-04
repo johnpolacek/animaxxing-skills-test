@@ -1,0 +1,8 @@
+packages:
+  - "vanilla/*"
+  - "nextjs/*"
+  - "astro/*"
+  - "sveltekit/*"
+  - "nuxt/*"
+  - "react-router/*"
+  - "tanstack/*"

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>About — Animaxxing</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+    <script type="module" src="/src/main.ts"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="shell">
+        <a class="brand" href="/">Animaxxing</a>
+        <nav class="site-nav" aria-label="Main">
+          <a data-testid="nav-home" href="/">Home</a>
+          <a data-testid="nav-about" href="/about/" aria-current="page">About</a>
+          <a data-testid="nav-work" href="/work/">Work</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <article class="page shell">
+        <h1>A studio built around a lifecycle</h1>
+        <p>The studio started as a checklist. Set the initial state before the first paint. Play the intro once the targets exist. Settle into plain CSS and clear the temporary styles. Run the outro on the live page before the browser leaves it. Commit only from the completion callback.</p>
+        <p>That checklist turned out to be the whole job. Most animation bugs are not easing problems, they are ownership problems: two timelines fighting over one element, or a page removed before its exit finished.</p>
+      </article>
+    </main>
+
+    <footer class="site-footer">
+      <div class="shell">
+        <p>&copy; <span data-year>2025</span> Animaxxing. Built to be read first.</p>
+      </div>
+    </footer>
+  </body>
+</html>

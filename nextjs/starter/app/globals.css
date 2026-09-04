@@ -1,0 +1,98 @@
+:root {
+  --background: #12110f;
+  --foreground: #f4f1ea;
+  --muted: #a9a294;
+  --accent: #e2b04a;
+  --rule: #2c2925;
+  --measure: 62ch;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 17px;
+  line-height: 1.65;
+}
+
+.site-header,
+.site-footer {
+  padding: 1.25rem 2rem;
+  border-color: var(--rule);
+  border-style: solid;
+  display: flex;
+  gap: 1.5rem;
+  align-items: baseline;
+}
+
+.site-header {
+  border-width: 0 0 1px;
+}
+
+.site-footer {
+  border-width: 1px 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin-top: auto;
+}
+
+.wordmark {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.site-nav {
+  display: flex;
+  gap: 1.25rem;
+}
+
+.site-nav a {
+  color: var(--muted);
+  text-decoration: none;
+  padding-bottom: 2px;
+  border-bottom: 1px solid transparent;
+}
+
+.site-nav a:hover,
+.site-nav a:focus-visible {
+  color: var(--foreground);
+  border-bottom-color: var(--accent);
+}
+
+.route {
+  flex: 1;
+}
+
+.page {
+  max-width: var(--measure);
+  margin: 0 auto;
+  padding: 4rem 2rem 5rem;
+}
+
+.page h1 {
+  font-size: clamp(2.25rem, 6vw, 3.25rem);
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  margin: 0 0 1.5rem;
+}
+
+.page p {
+  margin: 0 0 1.25rem;
+}
+
+.page p:last-child {
+  margin-bottom: 0;
+}

@@ -1,0 +1,19 @@
+{
+  "name": "nuxt-app",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nuxt dev",
+    "build": "nuxt build",
+    "preview": "PORT=3103 HOST=127.0.0.1 node .output/server/index.mjs"
+  },
+  "dependencies": {
+    "gsap": "^3.13.0",
+    "nuxt": "^4.5.2",
+    "vue": "^3.5.42"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}
