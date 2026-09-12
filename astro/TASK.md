@@ -38,3 +38,7 @@ paint, and the nav `data-testid`s. The page must stay readable with JavaScript d
 not flash settled content before the intro, on a full load and after a swap alike.
 
 Do not edit anything under `../tests/`. Run `pnpm test:astro` from the repo root when done and make it pass.
+
+## Initially hidden content
+
+Keep the successful invisible intro. The early marker must recover without the bundle; keep its deadline through setup and required font/media preparation. Register rollback before writes/splits. On failure, invalidate stale work, cancel animation, restore modified content, and settle the current owner once. Late initialization cannot hide the recovered visit. Preserve outgoing/intentional hidden states, independent chrome, reduced motion, and native links. Use the installed framework skill's `references/initialization.md` and the repository's initialization failure contract. Test the rendering mode actually produced; client-only content cannot appear without JavaScript.

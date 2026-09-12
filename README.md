@@ -21,6 +21,8 @@ animaxxing-skills-test/
   tanstack/              gsap-tanstack-router
 ```
 
+Set `VANILLA_TEST_PORT` to override vanilla’s port if another local app occupies it.
+
 Each framework's preview server has its own port so suites can run side by side: vanilla 4173, nextjs 3100, astro 3101, sveltekit 3102, nuxt 3103, react-router 3104, tanstack 3105.
 
 ## Run the specs against the reference implementations
@@ -47,3 +49,15 @@ pnpm eval nextjs
 See [CONTRACT.md](CONTRACT.md). In short: no flash of settled content and no blank page without JavaScript, a clean settled state, an outro that finishes before navigation, intro-only history navigation, one navigation at a time, interruptible intros, reduced motion that still completes every phase, cleanup after navigating away and back, and a once-only nav intro and whole-footer fade that preserve their DOM across navigation.
 
 The vanilla reference now fetches and swaps only page content to preserve the shell, with real anchors and full-document navigation as the no-JavaScript/error fallback. Astro persists the header and footer through its client router; the other frameworks keep them in their root layouts. Reloading starts a new intro.
+
+## Initialization regressions
+
+`shared/first-load.ts` verifies disabled-JavaScript content, native links, direct route URLs, and bundle failure after the early marker across all seven HTML-rendering references.
+
+`vanilla/tests/recovery.spec.ts` exercises `/recovery/`, an isolated fault fixture with real GSAP/SplitText and controlled setup/preparation failures. Run it with:
+
+```bash
+pnpm test:vanilla recovery.spec.ts
+```
+
+This fixture is excluded from agent-generated `APP_DIR` evaluations. It does not certify recovery in the seven application controllers. See the coverage limits in [CONTRACT.md](CONTRACT.md).

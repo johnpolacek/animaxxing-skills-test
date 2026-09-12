@@ -36,3 +36,15 @@ Three routes: `/` (home), `/about`, `/work`. Each has a heading, a paragraph or 
 Chrome uses `data-chrome="header|footer"` with its own `data-chrome-phase="initial|intro|settled"` so it does not interfere with page phases. `data-chrome-intro` marks the brand/wordmark, each nav link, and the footer itself, with no animated footer children. Chrome settles with the same clean inline-style requirements as page targets. A full reload starts a new document intro.
 
 Framework specs may add cases for behavior only that framework has, such as a hidden route being shown again, but every implementation passes the nine above.
+
+## Initialization failure contract
+
+An early marker alone is insufficient. Its independent deadline stays active through required preparation and timeline construction. Controller registration must not disarm it. Successful animation duration can exceed that deadline after a valid handoff.
+
+Recovery invalidates the current owner's work, cancels writers, restores partial styles and split DOM, then settles once. Late preparation and repeated setup cannot hide that visit again. Outgoing pages, closed panels, and persistent shell owners stay independent. Reduced motion preserves essential completion and link behavior.
+
+The common first-load suite asserts actual route HTML and native links with JavaScript disabled, and proves the early marker ran before blocking the bundle. Current references all send route HTML: vanilla and Astro are static; Next.js, Nuxt, SvelteKit, React Router framework mode, and TanStack Start use server rendering. Client-only variants require separate tests for their actual static fallback; do not claim they render missing route content without JavaScript.
+
+`vanilla/app/recovery/` is an isolated, production-built fault fixture using GSAP and SplitText. Its specs cover setup throws before/after styles and splits, a throwing disposer, an entrance callback failure, cancelled delayed writes, stalled/rejected font and media preparation, late bundles, no-flash success longer than the initialization budget, reduced motion, duplicate setup, and navigation during preparation. Faults are controlled inputs; font/media promises are stubbed. These tests validate the recovery contract, not every framework adapter or every motion recipe.
+
+Remaining adapter coverage: partial-setup recovery and stale promises in each framework's actual controller; hydration replay, streamed/cached routes, persisted Astro islands, Vue hook cancellation, and Svelte reused pages. Keep the existing lifecycle/history/chrome suites. Production indexing, field LCP, bfcache, and suspended-tab behavior need separate verification.

@@ -12,6 +12,7 @@ export default defineConfig({
         home: page("./index.html"),
         about: page("./about/index.html"),
         work: page("./work/index.html"),
+        recovery: page("./recovery/index.html"),
       },
     },
   },

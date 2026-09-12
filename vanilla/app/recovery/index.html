@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Initialization recovery fixture</title>
+  <script>
+    // Independent of the application module and GSAP. Budget covers setup only.
+    (() => {
+      const deadline = performance.now() + 900;
+      const records = new WeakMap();
+      const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const take = (root, until = deadline) => {
+        if (records.has(root)) return records.get(root);
+        let state = 'pending';
+        let completed = false;
+        let timer;
+        const disposers = [];
+        const current = () => root.isConnected && root.dataset.current === 'true';
+        const valid = () => current() && (state === 'pending' || state === 'running');
+        const cleanup = () => {
+          for (const dispose of disposers.splice(0).reverse()) {
+            try { dispose(); } catch { /* Continue to the final readable fallback. */ }
+          }
+        };
+        const finish = () => {
+          if (completed) return;
+          completed = true;
+          root.dataset.phase = 'settled';
+          root.dataset.completions = String(Number(root.dataset.completions || 0) + 1);
+        };
+        const recover = () => {
+          if (!valid()) return;
+          state = 'recovered'; // Invalidate callbacks before cancelling writers.
+          clearTimeout(timer);
+          cleanup();
+          root.dataset.boot = state;
+          finish();
+        };
+        const record = {
+          valid,
+          add: (dispose) => { if (valid()) disposers.push(dispose); else dispose(); },
+          start: () => {
+            if (!valid() || state !== 'pending') return false;
+            if (performance.now() >= until) { recover(); return false; }
+            state = 'running';
+            clearTimeout(timer);
+            root.dataset.phase = 'intro';
+            root.dataset.boot = state;
+            return true;
+          },
+          settle: () => {
+            if (!valid()) return;
+            state = 'settled';
+            clearTimeout(timer);
+            cleanup();
+            root.dataset.boot = state;
+            finish();
+          },
+          recover,
+          expire: () => { if (state === "pending") recover(); },
+          dispose: () => {
+            state = 'disposed';
+            clearTimeout(timer);
+            cleanup();
+          }
+        };
+        records.set(root, record);
+        timer = setTimeout(recover, Math.max(0, until - performance.now()));
+        if (reduced || performance.now() >= until) recover();
+        return record;
+      };
+      // Arm before hiding. This also recovers owners whose module never arrived.
+      setTimeout(() => {
+        document.querySelectorAll('[data-owner][data-current="true"]').forEach(root => take(root).expire());
+      }, Math.max(0, deadline - performance.now()));
+      window.motionBoot = { take, deadline };
+      if (!reduced) document.documentElement.dataset.motion = 'js';
+    })();
+  </script>
+  <style>
+    body { font: 20px/1.5 system-ui; margin: 40px; }
+    html[data-motion="js"] [data-current="true"][data-boot="pending"] [data-intro] { visibility: hidden; }
+    [hidden], [data-current="false"] { display: none !important; }
+  </style>
+  <script type="module" src="./main.ts"></script>
+</head>
+<body>
+  <nav data-owner data-current="true" data-boot="pending" data-phase="initial" id="shell">
+    <a data-intro href="/about/">About</a>
+  </nav>
+  <main data-owner data-current="true" data-boot="pending" data-phase="initial" id="page">
+    <h1 data-intro style="color: rgb(30, 50, 70)">Readable motion</h1>
+    <p data-intro>Essential content with a <a href="/work/">working link</a>.</p>
+    <div hidden id="closed-panel">Intentionally hidden content</div>
+  </main>
+  <main data-owner data-current="false" data-boot="pending" data-phase="end" id="outgoing">
+    <h1 data-intro>Outgoing content</h1>
+  </main>
+  <button id="repeat">Repeat setup</button>
+  <a id="navigate" href="/recovery/#destination">Navigate during setup</a>
+</body>
+</html>
