@@ -1,0 +1,27 @@
+<!doctype html><html><head><style>
+body{margin:0;font:16px sans-serif;padding:20px}
+.menu{position:fixed;inset:0;z-index:40;background:#222;color:#fff;visibility:hidden;display:grid;place-content:center;gap:12px}
+.menu a{display:block;font-size:32px;color:inherit}
+dialog{border:0;padding:24px;width:300px}
+dialog::backdrop{background:rgb(0 0 0/0.5);opacity:var(--dialog-backdrop,1)}
+dialog.drawer{margin:0 0 0 auto;height:100%;max-height:none;width:280px}
+.panel{background:#eee}
+.panel p{margin:0;padding:16px;height:120px}
+.tabs{position:relative;display:flex;gap:8px;width:600px;margin-top:20px}
+.tabs button{padding:8px 16px;background:none;border:0;font:inherit}
+.tab-indicator{position:absolute;inset-inline-start:0;bottom:0;width:40px;height:2px;background:#000}
+</style></head><body>
+<button id="menu-toggle" aria-expanded="false" aria-controls="menu">Menu</button>
+<nav class="menu" id="menu"><a href="#one" id="l1">One</a><a href="#two" id="l2">Two</a><a href="#three" id="l3">Three</a><button id="menu-close">Close</button></nav>
+
+<button id="open-dialog">Open dialog</button>
+<dialog id="dlg"><p>Hello</p><button id="dlg-ok">OK</button></dialog>
+<dialog id="drawer" class="drawer"><button id="drawer-close">Close</button></dialog>
+
+<button id="acc-toggle" aria-expanded="false" aria-controls="acc">Details</button>
+<div id="acc" class="panel" hidden><p>Content</p></div>
+<details id="det"><summary id="sum">More</summary><div id="det-panel" class="panel"><p>Content</p></div></details>
+
+<div class="tabs" role="tablist" id="tabs"><button role="tab" aria-selected="true" id="t1">Short</button><button role="tab" aria-selected="false" id="t2" style="width:160px">A wider tab</button><button role="tab" aria-selected="false" id="t3">Third one</button><span class="tab-indicator" id="ind"></span></div>
+<div class="tabs" role="tablist" id="rtl" dir="rtl"><button role="tab" aria-selected="true" id="r1">Short</button><button role="tab" aria-selected="false" id="r2" style="width:160px">Wide</button><span class="tab-indicator" id="rind"></span></div>
+<script src="../.build/component-motion.js"></script></body></html>
