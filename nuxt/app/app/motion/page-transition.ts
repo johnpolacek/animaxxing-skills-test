@@ -414,11 +414,17 @@ export const pageTransition: TransitionProps = {
     // is dropped at settled or on cancellation.
     const handoff = arrival.handoff;
     if (handoff && handoff.path === currentPath()) {
-      // Nuxt scrolls a frame after the leave, before this page's first paint.
-      // Flip works in document coordinates, so the morph is measured now and
-      // is right wherever the window lands.
+      // Nuxt's own scroll lands a frame after the leave's `done`, which would be
+      // mid-morph. Land it now, where the router will put it, so the later
+      // scrollBehavior finds the page already there; playShared corrects for
+      // the scroll change since capture.
       const target = root.querySelector<HTMLElement>(`[data-shared-hero][data-flip-id="${CSS.escape(handoff.id)}"]`);
-      if (target) playShared(handoff.state, target);
+      if (target) {
+        const scroller = getScroller();
+        if (scroller) scroller.scrollTo(location.hash || 0, { immediate: true });
+        else window.scrollTo(0, 0);
+        playShared(handoff.state, target);
+      }
     }
     playIntro(root, done, shouldSkipTravel(), {
       travel: !arrival.history,

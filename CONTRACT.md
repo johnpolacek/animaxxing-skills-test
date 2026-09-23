@@ -83,5 +83,6 @@ The window must be the document's scroll container: Lenis eases `window.scrollY`
 - The specs observe `data-shared`; GSAP Flip matches counterparts by `data-flip-id`, so the thumbnail and its hero carry both, with the same value.
 - Clicking `gallery-item-N` on a settled `/gallery`: the page goes to `outro`, the other intro targets leave, and the clicked thumbnail stays visible through `end`. No curtain.
 - On `/gallery/N`, the hero's first visible box is near the thumbnail's box, then it moves to its own. At `settled` it sits in its CSS box with no inline `transform`, `opacity`, or `visibility`.
+- From a scrolled `/gallery`, the morph still starts at the thumbnail's box on screen, and the router's scroll to the top never lands mid-morph as a jump.
 - Back to `/gallery` morphs nothing: every thumbnail's first visible box is its own.
 - Reduced motion: the hero's first visible box is its final box.
