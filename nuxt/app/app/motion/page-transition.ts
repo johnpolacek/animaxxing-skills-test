@@ -1,6 +1,9 @@
 import type { TransitionProps } from "vue";
 import { useGSAP } from "~/composables/useGSAP";
+import { captureShared, playShared, type SharedState } from "./layout-flip";
+import { curtain, type Curtain } from "./page-covers";
 import {
+  CURTAIN_OVERLAP,
   INTRO_DURATION,
   INTRO_RISE,
   INTRO_STAGGER,
@@ -15,6 +18,7 @@ import {
   settleOnce,
   shouldSkipTravel,
 } from "./phases";
+import { getScroller } from "./scroller";
 
 /*
  * The page lifecycle for `<NuxtPage :transition="pageTransition">`.
@@ -35,7 +39,27 @@ import {
  *   hook only hands `done` over.
  * - Intro on navigation. `onBeforeEnter` writes the initial values before the
  *   root is inserted; `onEnter` plays; `onAfterEnter` settles focus.
+ *
+ * The shell's archetypes ride on the same phases. The smooth scroller is
+ * stopped when an outro starts and started at settled. The curtain, created
+ * once by `app.vue`, closes inside the outro and opens with the intro. A
+ * shared element is captured on the outgoing root in `onBeforeLeave`, handed
+ * off keyed by destination, and played onto its counterpart in `onEnter`.
  */
+
+/** How a click asked to travel: an ordinary swap, behind the curtain, or with a shared element. */
+export type TransitionRequest = { kind: "plain" } | { kind: "curtain" } | { kind: "shared"; element: HTMLElement };
+
+type CurtainPhase = "idle" | "covering" | "covered" | "revealing";
+
+/** A shared element captured on the outgoing page, waiting for the page it was clicked toward. */
+type Handoff = { path: string; id: string; state: SharedState };
+
+/** What the incoming page's hooks need to know about the navigation that brought it. */
+type Arrival = { history: boolean; curtain: boolean; handoff: Handoff | null };
+
+const PLAIN: TransitionRequest = { kind: "plain" };
+const ordinaryArrival = (): Arrival => ({ history: false, curtain: false, handoff: null });
 
 /** The page root that currently owns the screen. */
 let livePage: HTMLElement | null = null;
@@ -60,6 +84,19 @@ let locked = false;
 
 /** Set by the client plugin from `history.listen`, consumed by the middleware. */
 let historyTarget: string | null = null;
+
+/** What the accepted link asked for; the outro consumes it. */
+let requested: TransitionRequest = PLAIN;
+/** The element the outro left lit for a morph, captured once the leave begins. */
+let keptElement: HTMLElement | null = null;
+/** Written by the middleware for the page about to enter; `onBeforeEnter` takes it. */
+let planned: Arrival = ordinaryArrival();
+/** The arrival the live page is playing, until it settles or is cancelled. */
+let arrival: Arrival = ordinaryArrival();
+
+/** The curtain, owned by the shell and reported on its root for CSS and tests. */
+let curtainRoot: HTMLElement | null = null;
+let cover: Curtain | null = null;
 
 export function isNavigationLocked(): boolean {
   return locked;
@@ -90,6 +127,60 @@ export function takeHistoryNavigation(fullPath: string): boolean {
   return isHistory;
 }
 
+/** What a link asks for: the curtain by opt-in, a morph when the link carries a shared element. */
+export function transitionFor(anchor: HTMLElement, kind?: "curtain"): TransitionRequest {
+  if (kind === "curtain") return { kind: "curtain" };
+  const element = anchor.matches("[data-shared]") ? anchor : anchor.querySelector<HTMLElement>("[data-shared]");
+  return element ? { kind: "shared", element } : PLAIN;
+}
+
+/** Called by the link just before it navigates; the outro reads it once. */
+export function requestTransition(request: TransitionRequest): void {
+  requested = request;
+}
+
+/**
+ * The curtain lives in `app.vue`, outside every page, so it survives the swap
+ * it hides. Created once from the shell; its phase is written on its root.
+ */
+export function mountCurtain(root: HTMLElement): () => void {
+  curtainRoot = root;
+  cover = curtain(root.querySelectorAll<HTMLElement>("[data-curtain-panel]"), { from: "bottom" });
+  setCurtainPhase("idle");
+  return () => {
+    cover?.revert();
+    cover = null;
+    curtainRoot = null;
+    root.setAttribute("data-curtain-phase", "idle");
+  };
+}
+
+function curtainPhase(): CurtainPhase {
+  return (curtainRoot?.getAttribute("data-curtain-phase") as CurtainPhase | null) ?? "idle";
+}
+
+function setCurtainPhase(phase: CurtainPhase): void {
+  if (curtainRoot && curtainRoot.getAttribute("data-curtain-phase") !== phase) {
+    curtainRoot.setAttribute("data-curtain-phase", phase);
+  }
+}
+
+/**
+ * Lowers the curtain from wherever it is. The phase follows the sweep's
+ * completion, so `idle` is written when the panels are at rest, not when the
+ * call returns; under reduced motion that is the next frame.
+ */
+function revealCurtain(): void {
+  if (!cover) return;
+  setCurtainPhase("revealing");
+  cover.reveal().eventCallback("onComplete", () => setCurtainPhase("idle"));
+}
+
+/** The committed route, which the hooks see after the URL has changed. */
+function currentPath(): string {
+  return useRouter().currentRoute.value.path.replace(/\/$/, "") || "/";
+}
+
 function claim(el: HTMLElement): void {
   livePage = el;
   introTimeline = null;
@@ -102,13 +193,14 @@ function claim(el: HTMLElement): void {
  *
  * Written with `set`, never with a `from` tween, so it is correct on a node
  * that already holds settled values. `visibility` (through `autoAlpha`) keeps
- * the layout box, so revealing the content shifts nothing.
+ * the layout box, so revealing the content shifts nothing. A history arrival
+ * takes the quieter path: it fades in without the rise.
  */
-function applyInitial(el: HTMLElement, skipTravel: boolean): void {
+function applyInitial(el: HTMLElement, skipTravel: boolean, travel: boolean): void {
   const { gsap } = useGSAP();
   setPhase(el, "initial");
   if (skipTravel) return;
-  gsap.set(introTargets(el), { autoAlpha: 0, y: INTRO_RISE });
+  gsap.set(introTargets(el), travel ? { autoAlpha: 0, y: INTRO_RISE } : { autoAlpha: 0 });
 }
 
 /** Settled is CSS, not a held timeline: drop every temporary style. */
@@ -119,20 +211,29 @@ function settle(el: HTMLElement): void {
   setPhase(el, "settled");
 }
 
+type IntroOptions = {
+  /** Rise as well as fade. Off for history arrivals, which the user has already seen. */
+  travel: boolean;
+  /** Open the curtain as the intro starts. */
+  reveal: boolean;
+};
+
 /**
  * Intro: one timeline from the initial values to settled.
  *
  * The phase flip is deferred by a microtask so `initial` is observable on its
  * own, and so nothing starts moving in the same task the root was inserted in.
- * A microtask is still before paint.
+ * A microtask is still before paint. The curtain, when it is up, starts to
+ * open in the same step, overlapping the intro; the page is prepared by then.
  */
-function playIntro(el: HTMLElement, done: () => void, skipTravel: boolean): void {
+function playIntro(el: HTMLElement, done: () => void, skipTravel: boolean, { travel, reveal }: IntroOptions): void {
   const { gsap } = useGSAP();
   const finish = settleOnce(done);
 
   pendingStep = nextStep(() => {
     pendingStep = null;
     setPhase(el, "intro");
+    if (reveal) revealCurtain();
 
     if (skipTravel) {
       // No travel, but every phase still happens and every callback still runs.
@@ -156,7 +257,7 @@ function playIntro(el: HTMLElement, done: () => void, skipTravel: boolean): void
         autoAlpha: 1,
         y: 0,
         duration: INTRO_DURATION,
-        stagger: INTRO_STAGGER,
+        stagger: travel ? INTRO_STAGGER : 0,
         ease: "power2.out",
       });
   });
@@ -173,9 +274,34 @@ function playIntro(el: HTMLElement, done: () => void, skipTravel: boolean): void
 export function startFirstLoadIntro(el: HTMLElement): void {
   claim(el);
   const skipTravel = shouldSkipTravel();
-  applyInitial(el, skipTravel);
+  applyInitial(el, skipTravel, true);
   document.documentElement.removeAttribute(ROOT_PHASE_ATTRIBUTE);
-  playIntro(el, () => {}, skipTravel);
+  playIntro(el, () => {}, skipTravel, { travel: true, reveal: false });
+}
+
+/**
+ * Back and forward take the intro-only path. The middleware calls this instead
+ * of the outro: nothing leaves, nothing covers, nothing is captured, and the
+ * page holds still until the returning page settles.
+ */
+export function planHistoryArrival(): void {
+  requested = PLAIN;
+  keptElement = null;
+  planned = { history: true, curtain: false, handoff: null };
+  getScroller()?.stop();
+}
+
+/**
+ * A navigation ended without a page: cancelled, failed, or a same-page change.
+ * Nothing will enter, so release what the outro held. Called from the
+ * `page:loading:end` handler that also releases the lock.
+ */
+export function abandonNavigation(): void {
+  requested = PLAIN;
+  keptElement = null;
+  planned = ordinaryArrival();
+  getScroller()?.start();
+  if (curtainPhase() !== "idle") revealCurtain();
 }
 
 /**
@@ -185,13 +311,28 @@ export function startFirstLoadIntro(el: HTMLElement): void {
  * Awaited by the route middleware, which runs before Vue Router commits, so
  * the URL is still the old one for the whole outro. That is the only place a
  * Nuxt navigation can be held: by `onLeave` the URL has already changed.
+ *
+ * A curtain link composes the cover into this timeline, so the viewport is
+ * covered before the URL changes. A shared-element link leaves its element,
+ * and whatever holds it, lit: that is what the user sees through the swap.
  */
 export function runPageOutro(): Promise<void> {
   if (outroInFlight) return outroInFlight;
+  const request = requested;
+  requested = PLAIN;
   const el = livePage;
   if (!el || phaseOf(el) === "end" || phaseOf(el) === "outro") return Promise.resolve();
 
   const { gsap } = useGSAP();
+  const skipTravel = shouldSkipTravel();
+  // The page cannot be scrolled from here until the incoming page settles.
+  getScroller()?.stop();
+  const keep = request.kind === "shared" && el.contains(request.element) ? request.element : null;
+  keptElement = keep;
+  // Reduced motion never shows a panel: the navigation falls back to the plain swap.
+  const useCurtain = request.kind === "curtain" && cover !== null && !skipTravel;
+  planned = { history: false, curtain: useCurtain, handoff: null };
+
   outroInFlight = new Promise<void>((resolve) => {
     // An intro is not the inverse of the outro, so kill it and leave from
     // whatever is on screen rather than reversing.
@@ -201,8 +342,8 @@ export function runPageOutro(): Promise<void> {
     introTimeline = null;
 
     // Queried at leave time, so anything that arrived after the intro leaves
-    // with the page.
-    const targets = introTargets(el);
+    // with the page. A kept element, and anything holding it, stays lit.
+    const targets = introTargets(el).filter((target) => !keep || !(target.contains(keep) || keep.contains(target)));
     setPhase(el, "outro");
 
     // End state: still in the DOM, final values applied, safe to remove. CSS
@@ -212,13 +353,13 @@ export function runPageOutro(): Promise<void> {
       resolve();
     });
 
-    if (shouldSkipTravel()) {
+    if (skipTravel) {
       gsap.set(targets, { autoAlpha: 0 });
       pendingStep = nextStep(end);
       return;
     }
 
-    gsap
+    const outro = gsap
       .timeline({ onComplete: end, onInterrupt: end })
       .set(targets, { willChange: "transform, opacity" })
       .to(targets, {
@@ -228,6 +369,15 @@ export function runPageOutro(): Promise<void> {
         stagger: OUTRO_STAGGER,
         ease: "power2.in",
       });
+
+    if (useCurtain && cover) {
+      // The cover belongs to the shell's timeline, never to a page context,
+      // and the end state waits for it: the swap happens covered.
+      setCurtainPhase("covering");
+      const sweep = cover.cover();
+      sweep.eventCallback("onComplete", () => setCurtainPhase("covered"));
+      outro.add(sweep, `-=${CURTAIN_OVERLAP}`);
+    }
   }).finally(() => {
     outroInFlight = null;
   });
@@ -252,11 +402,29 @@ export const pageTransition: TransitionProps = {
     const root = el as HTMLElement;
     unlockNavigation();
     claim(root);
-    applyInitial(root, shouldSkipTravel());
+    arrival = planned;
+    planned = ordinaryArrival();
+    applyInitial(root, shouldSkipTravel(), !arrival.history);
   },
 
   onEnter(el, done) {
-    playIntro(el as HTMLElement, done, shouldSkipTravel());
+    const root = el as HTMLElement;
+    // The morph first, in the same task as insertion, so the first painted
+    // frame shows the hero at the thumbnail's box. Read, never consumed: it
+    // is dropped at settled or on cancellation.
+    const handoff = arrival.handoff;
+    if (handoff && handoff.path === currentPath()) {
+      // Nuxt scrolls a frame after the leave, before this page's first paint.
+      // Flip works in document coordinates, so the morph is measured now and
+      // is right wherever the window lands.
+      const target = root.querySelector<HTMLElement>(`[data-shared-hero][data-flip-id="${CSS.escape(handoff.id)}"]`);
+      if (target) playShared(handoff.state, target);
+    }
+    playIntro(root, done, shouldSkipTravel(), {
+      travel: !arrival.history,
+      // A history move never covers, but it lowers a curtain a cancelled navigation left up.
+      reveal: arrival.curtain || curtainPhase() !== "idle",
+    });
   },
 
   onAfterEnter(el) {
@@ -264,17 +432,35 @@ export const pageTransition: TransitionProps = {
     // Only when the intro actually reached settled: this also fires after an
     // intro that was killed by an outro, and that page is on its way out.
     if (phaseOf(root) !== "settled") return;
+    arrival = ordinaryArrival();
+    // The page has its settled layout: re-measure, then hand the scroll back.
+    const scroller = getScroller();
+    scroller?.resize();
+    scroller?.start();
     // Never steal focus from a control the reader is using.
     if (document.activeElement === document.body) root.focus({ preventScroll: true });
   },
 
   onEnterCancelled(el) {
     const { gsap } = useGSAP();
+    arrival = ordinaryArrival();
     pendingStep?.();
     pendingStep = null;
     introTimeline?.kill();
     introTimeline = null;
     gsap.killTweensOf(introTargets(el as HTMLElement));
+  },
+
+  onBeforeLeave(el) {
+    // The old root is laid out and the new one is not yet inserted, in either
+    // mode. The element the outro left lit is captured here, keyed by the
+    // destination, which the router has already committed. A history move
+    // captures nothing: it has no outro and takes the ordinary intro.
+    const root = el as HTMLElement;
+    const kept = keptElement;
+    keptElement = null;
+    if (!kept || planned.history || !root.contains(kept)) return;
+    planned.handoff = { path: currentPath(), id: kept.dataset.flipId ?? "", state: captureShared(kept) };
   },
 
   onLeave(el, done) {

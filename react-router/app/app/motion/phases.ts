@@ -44,6 +44,21 @@ export function motionReleased(): boolean {
 }
 
 /**
+ * True when this document itself was reached by back or forward. The router
+ * reports the first location of any document as a `POP`, so it cannot tell a
+ * reload from a return; the navigation timing entry can.
+ */
+export function documentRestored(): boolean {
+  const entry = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+  return entry?.type === "back_forward";
+}
+
+/** `/gallery/` and `/gallery` are the same route. */
+export function routeOf(pathname: string): string {
+  return pathname.replace(/\/$/, "") || "/";
+}
+
+/**
  * Run `step` in its own microtask.
  *
  * Phase changes must be observable one at a time. Writing two of them in a

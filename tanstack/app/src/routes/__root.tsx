@@ -7,9 +7,12 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import type { ReactNode } from "react";
+import { Curtain } from "../motion/Curtain";
 import { MotionScript } from "../motion/MotionScript";
 import { RouteArea, RouteTransition } from "../motion/RouteTransition";
 import appCss from "../styles.css?url";
+// Lenis's stylesheet, once, from the shell: it holds the page while the scroller is stopped.
+import lenisCss from "lenis/dist/lenis.css?url";
 
 export const Route = createRootRoute({
   head: () => ({
@@ -18,7 +21,10 @@ export const Route = createRootRoute({
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Lifecycle" },
     ],
-    links: [{ rel: "stylesheet", href: appCss }],
+    links: [
+      { rel: "stylesheet", href: appCss },
+      { rel: "stylesheet", href: lenisCss },
+    ],
   }),
   component: RootComponent,
 });
@@ -26,7 +32,8 @@ export const Route = createRootRoute({
 /**
  * The root route component mounts once per document and outlives every client
  * navigation, so it is where the route transition controller lives. Persistent
- * chrome sits outside the route container the controller covers.
+ * chrome sits outside the route container the controller covers, and so does
+ * the curtain, which passes over the chrome and survives the swap it hides.
  */
 function RootComponent() {
   return (
@@ -50,6 +57,7 @@ function RootComponent() {
         <RouteArea>
           <Outlet />
         </RouteArea>
+        <Curtain />
         <footer className="site-footer" data-chrome="footer" data-chrome-phase="initial" data-chrome-intro="">
           <span>Three routes, one lifecycle.</span>
         </footer>

@@ -51,6 +51,10 @@ See [CONTRACT.md](CONTRACT.md). In short: no flash of settled content and no bla
 
 The vanilla reference now fetches and swaps only page content to preserve the shell, with real anchors and full-document navigation as the no-JavaScript/error fallback. Astro persists the header and footer through its client router; the other frameworks keep them in their root layouts. Reloading starts a new intro.
 
+## Transition archetypes
+
+`shared/archetypes.ts` checks one smooth scroller per document, a curtain navigation, and a shared-element morph from `/gallery` to `/gallery/N` in every reference app, as described under "Transition archetypes" in [CONTRACT.md](CONTRACT.md). Each framework's `tests/archetypes.spec.ts` runs it. The archetypes are not part of `TASK.md`, so the suite skips agent-built apps under `APP_DIR`.
+
 ## Initialization regressions
 
 `shared/first-load.ts` verifies disabled-JavaScript content, native links, direct route URLs, and bundle failure after the early marker across all seven HTML-rendering references.

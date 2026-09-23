@@ -10,9 +10,10 @@
     OUTRO_STAGGER,
     motionReleased,
     prefersReducedMotion,
+    type Arrival,
     type Phase,
   } from "./phases";
-  import { getRouteTransition, type PageController } from "./route-transition";
+  import { getRouteTransition, type LeaveOptions, type PageController } from "./route-transition";
 
   let { children }: { children: Snippet } = $props();
 
@@ -47,7 +48,7 @@
     /** Queried per call, so anything rendered since setup is included. */
     const targets = () => gsap.utils.toArray<HTMLElement>("[data-intro]", root);
 
-    const runIntro = async () => {
+    const runIntro = async (arrival: Arrival, prepared: () => void, onSettled?: () => void) => {
       // An intro can start on DOM that already holds settled values, so the
       // previous timeline is killed and start values are written explicitly
       // rather than inferred by a `from` tween that trusts a fresh node.
@@ -59,12 +60,16 @@
       // failsafe already put the content on screen: hiding it again to play an
       // intro would be worse than arriving settled.
       const instant = prefersReducedMotion() || motionReleased();
+      // A history arrival fades in place: the reader has seen this page.
+      const rise = arrival === "fresh" ? INTRO_RISE : 0;
       const els = targets();
       context.add(() => {
-        gsap.set(els, instant ? { autoAlpha: 1, y: 0 } : { autoAlpha: 0, y: INTRO_RISE });
+        gsap.set(els, instant ? { autoAlpha: 1, y: 0 } : { autoAlpha: 0, y: rise });
       });
 
       await setPhase("intro");
+      // Start values are on the DOM and the phase is public: the page is prepared.
+      prepared();
 
       const settle = async () => {
         intro = null;
@@ -74,6 +79,7 @@
           gsap.set(els, { clearProps: "all" });
         });
         await setPhase("settled");
+        onSettled?.();
       };
 
       if (instant) {
@@ -90,13 +96,13 @@
             autoAlpha: 1,
             y: 0,
             duration: INTRO_DURATION,
-            stagger: INTRO_STAGGER,
+            stagger: arrival === "fresh" ? INTRO_STAGGER : 0,
             ease: "power2.out",
           });
       });
     };
 
-    const runOutro = () =>
+    const runOutro = ({ keep = null }: LeaveOptions = {}) =>
       new Promise<void>((resolve) => {
         // The intro is not the inverse of the outro, so kill it and leave from
         // whatever is on screen rather than reversing it.
@@ -104,7 +110,8 @@
         intro = null;
 
         // Queried at leave time so late-arriving content leaves with the page.
-        const els = targets();
+        // A kept element, and anything holding it, stays lit through the swap.
+        const els = targets().filter((el) => !keep || !(el.contains(keep) || keep.contains(el)));
 
         let ended = false;
         const end = () => {
@@ -142,7 +149,10 @@
 
     const controller: PageController = {
       root,
-      enter: () => void runIntro(),
+      enter: (arrival, onSettled) =>
+        new Promise<void>((prepared) => {
+          void runIntro(arrival, prepared, onSettled);
+        }),
       leave: runOutro,
     };
     const unregister = registerPage(controller);

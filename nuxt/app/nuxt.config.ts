@@ -3,7 +3,8 @@ import { PREPAINT_SCRIPT } from "./app/motion/phases";
 export default defineNuxtConfig({
   compatibilityDate: "2025-11-01",
   ssr: true,
-  css: ["~/assets/css/main.css"],
+  // Lenis needs its stylesheet once, from the shell's global styles.
+  css: ["~/assets/css/main.css", "lenis/dist/lenis.css"],
   devtools: { enabled: false },
   telemetry: false,
   app: {

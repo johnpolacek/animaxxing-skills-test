@@ -181,3 +181,22 @@ test("ScrollSmoother ignores a stale hash and restores scroll-behavior on destro
   });
   expect(result).toEqual({ threw: false, html: "", body: "" });
 });
+
+test("a jump into a page taller than Lenis last measured still lands", async ({ open }) => {
+  const page = await open("smooth-scroll");
+  const result = await page.evaluate(async () => {
+    const s = (window as any).L.lenisScroll();
+    s.stop();
+    // A route swap brings in a much taller page; Lenis has not re-measured yet.
+    const tall = document.createElement("section");
+    tall.style.height = "6000px";
+    document.body.append(tall);
+    const target = document.documentElement.scrollHeight - innerHeight - 10;
+    s.scrollTo(target, { immediate: true });
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    const y = window.scrollY;
+    s.destroy();
+    return { y, target };
+  });
+  expect(Math.abs(result.y - result.target)).toBeLessThanOrEqual(2);
+});

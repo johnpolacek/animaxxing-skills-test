@@ -8,7 +8,8 @@
     "preview": "vite preview --port 4173 --strictPort"
   },
   "dependencies": {
-    "gsap": "^3.13.0"
+    "gsap": "^3.13.0",
+    "lenis": "^1.3.26"
   },
   "devDependencies": {
     "typescript": "^5.9.3",

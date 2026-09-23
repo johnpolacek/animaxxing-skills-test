@@ -1,4 +1,13 @@
 import { getContext, setContext } from "svelte";
+import type { Arrival } from "./phases";
+
+export type LeaveOptions = {
+  /**
+   * An element left lit through the outro, such as a shared element about to
+   * morph into the next page. Targets around it fade; it and its ancestors stay.
+   */
+  keep?: Element | null;
+};
 
 /**
  * One page's lifecycle, handed to the layout controller so it can drive the
@@ -7,10 +16,15 @@ import { getContext, setContext } from "svelte";
 export type PageController = {
   /** The route content wrapper this controller owns. */
   root: HTMLElement;
-  /** Write initial values and play the intro. Safe to call on reused DOM. */
-  enter: () => void;
+  /**
+   * Write initial values and play the intro. Safe to call on reused DOM.
+   * Resolves once the start values are written and the phase is `intro`: the
+   * page is prepared, so a curtain may reveal it and a shared element may
+   * morph onto it. `onSettled` runs once, from the settled state.
+   */
+  enter: (arrival: Arrival, onSettled?: () => void) => Promise<void>;
   /** Play the outro on live DOM; resolves once the end state is applied. */
-  leave: () => Promise<void>;
+  leave: (options?: LeaveOptions) => Promise<void>;
 };
 
 export type RouteTransition = {

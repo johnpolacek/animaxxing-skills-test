@@ -1,0 +1,46 @@
+---
+import Layout from "../../layouts/Layout.astro";
+
+export function getStaticPaths() {
+  return [
+    { params: { n: "1" }, props: { caption: "Archive reader", blurb: "A reading app for a national archive, where every transition had to survive a slow connection and a screen reader." } },
+    { params: { n: "2" }, props: { caption: "Booking flow", blurb: "A booking flow for a clinic, where the only animation left in the final build is the one that tells you a slot is gone." } },
+    { params: { n: "3" }, props: { caption: "Documentation search", blurb: "A documentation search that lays out its results before it has them, so the first keystroke never moves the page." } },
+  ];
+}
+
+const { n } = Astro.params;
+const { caption, blurb } = Astro.props;
+---
+
+<Layout title={`Item ${n} — Animaxxing`}>
+  <article class="page page--wide shell" data-page={`gallery-${n}`} data-phase="initial" tabindex="-1">
+    <h1 data-intro>Item {n}</h1>
+    <!--
+      The hero reserves its size in CSS and is not an intro target, so it is visible at full size
+      before the intro starts and Flip alone owns it during a morph. Same `data-flip-id` as the
+      thumbnail it came from.
+    -->
+    <figure class="hero-figure">
+      <div class={`swatch swatch--${n}`} data-shared={`item-${n}`} data-flip-id={`item-${n}`} data-shared-hero></div>
+      <figcaption data-intro>{caption}</figcaption>
+    </figure>
+    <p data-intro>{blurb}</p>
+    <p data-intro><a data-testid="gallery-back" href="/gallery">Back to the gallery</a></p>
+    <section class="notes notes--item" data-intro aria-labelledby="notes-heading">
+      <h2 id="notes-heading">Notes on reserved space</h2>
+      <p>
+        This picture arrived as a thumbnail and grew into this box without a cut: the same element,
+        captured before it left the gallery and played once this page had its layout.
+      </p>
+      <p>
+        The hero reserves its size in CSS, so it is visible at full size before the heading and text
+        rise in. Under reduced motion it is simply there.
+      </p>
+      <p>
+        The rest of the page scrolls, so a wheel here has somewhere to go, and the back link takes the
+        ordinary transition.
+      </p>
+    </section>
+  </article>
+</Layout>
