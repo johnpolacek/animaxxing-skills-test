@@ -299,6 +299,28 @@ export function archetypeTests() {
       expect(final.w).toBeGreaterThan(thumb.w * 2);
     });
 
+    test("Shared element: from a scrolled gallery, the morph starts on screen and never jumps", async ({ page }) => {
+      await settleAt(page, "/gallery");
+      await page.mouse.wheel(0, 200);
+      await page.waitForTimeout(1500);
+      expect(await scrollY(page)).toBeGreaterThan(150);
+      const thumb = await boxOf(page, THUMB(2));
+      const samples = await sampleFrames(page, 2, 2500, () => clickInPlace(page, "gallery-item-2"));
+      await expect(page).toHaveURL(/\/gallery\/2\/?$/);
+      await expectSettledClean(page);
+      expect(await scrollY(page)).toBeLessThanOrEqual(1);
+
+      // The morph starts where the thumbnail was on screen, not where it sat in the document.
+      const morph = samples.filter((s) => s.hero.visible).map((s) => s.hero.box!);
+      expect(morph.length).toBeGreaterThan(3);
+      expect(near(morph[0]!, thumb, 40), `first hero box ${JSON.stringify(morph[0])} vs thumbnail ${JSON.stringify(thumb)}`).toBe(true);
+      // A router scroll landing mid-morph shows up as one frame's jump the size of the scroll.
+      const jumps = morph.slice(1).map((box, i) => Math.abs(box.y - morph[i]!.y));
+      expect(Math.max(...jumps), `largest frame-to-frame jump ${Math.max(...jumps)}px`).toBeLessThan(100);
+      const final = await boxOf(page, HERO(2));
+      expect(near(morph.at(-1)!, final, 2)).toBe(true);
+    });
+
     test("Shared element: back to the gallery morphs nothing", async ({ page, phases }) => {
       await settleAt(page, "/gallery");
       const thumb = await boxOf(page, THUMB(2));
