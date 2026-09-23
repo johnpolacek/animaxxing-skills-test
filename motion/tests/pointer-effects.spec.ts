@@ -58,10 +58,11 @@ test("a throwing tilt setup rolls back and rethrows", async ({ open }) => {
       return "no throw";
     } catch (error) {
       card.getBoundingClientRect = measure;
-      return `${(error as Error).message}|${card.getAttribute("style")}`;
+      // The failed setup must not stay GSAP's current context.
+      return `${(error as Error).message}|${card.getAttribute("style")}|${!!(window as any).gsap.context()}`;
     }
   });
-  expect(result).toBe("boom|transform: translateZ(0px);");
+  expect(result).toBe("boom|transform: translateZ(0px);|false");
 });
 
 test("cursor follower trails the mouse, grows over targets, and restores", async ({ open }) => {
@@ -148,4 +149,25 @@ test("reduced motion skips decoration and keeps a drag without the throw", async
     return snapshot;
   });
   expect(result).toEqual({ inertia: false, mag: "", cur: "" });
+});
+
+test("reduced motion: a drag without the throw still lands on the nearest item", async ({ open }) => {
+  const page = await open("pointer-effects");
+  await page.evaluate(() => {
+    document.documentElement.dataset.motion = "reduced";
+    (window as any).dt = (window as any).P.dragTrack(document.getElementById("vp"), document.getElementById("tr"));
+  });
+  await page.mouse.move(500, 470);
+  await page.mouse.down();
+  for (let i = 1; i <= 10; i++) {
+    await page.mouse.move(500 - 17 * i, 470);
+    await page.waitForTimeout(16);
+  }
+  await page.mouse.up();
+  await page.waitForTimeout(200);
+  const x = await prop(page, "#tr", "x");
+  // Released near -170; the nearest stop is -310 (stops: 0, -310, -620, -740).
+  expect(Math.abs(x + 310), `landed x ${x}`).toBeLessThan(1);
+  await page.evaluate(() => (window as any).dt.revert());
+  expect(await style(page, "#tr")).toBe("");
 });

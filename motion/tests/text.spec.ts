@@ -151,6 +151,49 @@ test("wave ripples without drifting and its stop restores the heading", async ({
   expect(await page.$eval("#h", (el) => el.innerHTML)).toBe(original);
 });
 
+test("wave pauses without re-splitting and resumes", async ({ open }) => {
+  const page = await open("text");
+  /** Whether any letter moves within `ms`, sampled every frame. */
+  const moves = (ms: number) =>
+    page.evaluate(async (window_) => {
+      const heading = document.getElementById("h")!;
+      const start = heading.innerHTML;
+      const end = performance.now() + window_;
+      let moved = false;
+      while (performance.now() < end) {
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+        if (heading.innerHTML !== start) moved = true;
+      }
+      return moved;
+    }, ms);
+  await page.evaluate(() => ((window as any).wave = (window as any).W.startWave(document.getElementById("h"), { period: 0.3 })));
+  expect(await moves(900)).toBe(true);
+  await page.evaluate(() => (window as any).wave.pause());
+  // A pass already running lands at rest; wait for it rather than a fixed time.
+  for (let i = 0; i < 10 && (await moves(400)); i++);
+  const letters = await page.$eval("#h", (el) => el.querySelectorAll("div").length);
+  expect(await moves(900)).toBe(false);
+  expect(await page.$eval("#h", (el) => el.querySelectorAll("div").length)).toBe(letters);
+  await page.evaluate(() => (window as any).wave.resume());
+  expect(await moves(900)).toBe(true);
+  await page.evaluate(() => (window as any).wave());
+});
+
+test("a wave stopped with keepSplit hands every letter over at rest", async ({ open }) => {
+  const page = await open("text");
+  const result = await page.evaluate(async () => {
+    const heading = document.getElementById("h")!;
+    const wave = (window as any).W.startWave(heading, { period: 0.2 });
+    const letters = () => Array.from(heading.querySelectorAll<HTMLElement>("div"));
+    const moving = () => letters().some((c) => c.style.transform || c.style.fontWeight || c.style.opacity);
+    for (let i = 0; i < 300 && !moving(); i++) await new Promise((resolve) => requestAnimationFrame(resolve));
+    const caught = moving();
+    wave(true);
+    return { caught, moving: moving(), split: letters().length > 0, willChange: letters().some((c) => c.style.willChange) };
+  });
+  expect(result).toEqual({ caught: true, moving: false, split: true, willChange: false });
+});
+
 test("wave does nothing under reduced motion", async ({ open }) => {
   const page = await open("text");
   const original = await page.$eval("#h", (el) => el.innerHTML);
