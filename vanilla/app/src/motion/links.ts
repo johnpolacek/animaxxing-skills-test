@@ -1,3 +1,6 @@
+/** Routes this site serves as its own documents; anything else stays a native navigation. */
+const ROUTES = ["/", "/about", "/work", "/gallery", "/gallery/1", "/gallery/2", "/gallery/3"];
+
 /** The link this click should transition to, or null to leave the click alone. */
 function transitionableLink(event: MouseEvent): HTMLAnchorElement | null {
   if (event.defaultPrevented) return null;
@@ -18,12 +21,12 @@ function transitionableLink(event: MouseEvent): HTMLAnchorElement | null {
   // Hash-only and same-location links: let the browser do its own thing.
   if (url.pathname === location.pathname && url.search === location.search) return null;
 
-  if (!["/", "/about", "/work"].includes(url.pathname.replace(/\/$/, "") || "/")) return null;
+  if (!ROUTES.includes(url.pathname.replace(/\/$/, "") || "/")) return null;
   return anchor;
 }
 
 /** Intercept only ordinary internal links; native anchor semantics stay intact. */
-export function interceptLinks(run: (href: string) => Promise<void>) {
+export function interceptLinks(run: (href: string, link: HTMLAnchorElement) => Promise<void>) {
   let locked = false;
   let generation = 0;
   document.addEventListener("click", (event) => {
@@ -33,7 +36,7 @@ export function interceptLinks(run: (href: string) => Promise<void>) {
     if (locked) return;
     locked = true;
     const token = ++generation;
-    void run(link.href).finally(() => {
+    void run(link.href, link).finally(() => {
       if (token === generation) locked = false;
     });
   });

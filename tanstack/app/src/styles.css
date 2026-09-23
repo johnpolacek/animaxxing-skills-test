@@ -97,6 +97,124 @@ body {
   margin-bottom: 0;
 }
 
+.page--wide {
+  max-width: 48rem;
+}
+
+/*
+ * Gallery.
+ *
+ * Thumbnails and heroes are plain blocks that reserve their size in CSS. The
+ * shared element carries `data-shared` for the site and `data-flip-id` for
+ * Flip; it is never an intro target, so it is neither hidden before paint nor
+ * moved by the page's stagger, and Flip alone owns it during a morph.
+ */
+.gallery {
+  list-style: none;
+  margin: 0 0 2rem;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+}
+
+.gallery-item {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+.gallery-caption {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.swatch {
+  display: block;
+  width: 160px;
+  height: 100px;
+  border-radius: 4px;
+  background: var(--rule);
+}
+
+.swatch--1 {
+  background: linear-gradient(135deg, #e2b04a, #f7e3b4);
+}
+
+.swatch--2 {
+  background: linear-gradient(135deg, #3f8f82, #b4e4d9);
+}
+
+.swatch--3 {
+  background: linear-gradient(135deg, #c96a3a, #f4cfae);
+}
+
+.hero-figure {
+  margin: 0 0 1.5rem;
+}
+
+.hero-figure .swatch {
+  width: min(480px, 100%);
+  height: auto;
+  aspect-ratio: 8 / 5;
+}
+
+.hero-figure figcaption {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+/* Reading matter below the fold, so the gallery pages scroll well past the
+   viewport and the scroller has room to ease. */
+.notes {
+  margin-top: 3rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--rule);
+}
+
+.notes h2 {
+  font-size: 1.35rem;
+  margin: 0 0 1rem;
+}
+
+.notes--gallery {
+  min-height: 2400px;
+}
+
+.notes--item {
+  min-height: 1400px;
+}
+
+/*
+ * Curtain.
+ *
+ * Lives in the shell beside the route container, fixed over the viewport, so
+ * it survives the swap it hides and is the one cover that passes over the
+ * chrome. At rest the panels are hidden and the root takes no pointer events,
+ * so the page underneath stays clickable and a reader without JavaScript never
+ * sees a panel. The controller sweeps the panels in over the outro and out over
+ * the intro.
+ */
+.curtain {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  pointer-events: none;
+  color: var(--accent);
+}
+
+.curtain-panel {
+  flex: 1;
+  background: currentColor;
+  visibility: hidden;
+}
+
 /*
  * Pre-paint initial state.
  *

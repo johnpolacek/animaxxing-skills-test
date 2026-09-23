@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Gallery — Animaxxing</title>
+
+    <script>
+      /*
+        Pre-paint mark. Runs before any content is parsed, so the CSS rule in
+        styles.css can hide intro targets during the initial phase without ever
+        hiding them from a reader who has no JavaScript. Under reduced motion
+        the mark is skipped entirely and the page paints settled.
+      */
+      (function () {
+        var root = document.documentElement;
+        try {
+          if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+        } catch (e) {}
+        root.setAttribute("data-motion", "js");
+        // If the module never runs, release the rule rather than trap the page
+        // behind a mark nothing will clear.
+        var release = function () {
+          if (!root.hasAttribute("data-motion-live")) {
+            root.removeAttribute("data-motion");
+          }
+        };
+        window.addEventListener("load", release);
+        window.setTimeout(release, 1300);
+      })();
+    </script>
+    <link rel="stylesheet" href="/src/styles.css" />
+    <script type="module" src="/src/main.ts"></script>
+  </head>
+  <body>
+    <header class="site-header" data-chrome="header" data-chrome-phase="initial">
+      <div class="shell">
+        <a class="brand" data-chrome-intro="" href="/">Animaxxing</a>
+        <nav class="site-nav" aria-label="Main">
+          <a data-chrome-intro="" data-testid="nav-home" href="/">Home</a>
+          <a data-chrome-intro="" data-testid="nav-about" href="/about/">About</a>
+          <a data-chrome-intro="" data-testid="nav-work" href="/work/">Work</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <article class="page page--wide shell" data-page="gallery" data-phase="initial">
+        <h1 data-intro>Gallery</h1>
+        <p data-intro>Three studies in reserved space. Each opens into its own page, and the picture you choose travels there.</p>
+        <ul class="gallery" role="list">
+          <li>
+            <a class="gallery-item" data-intro data-testid="gallery-item-1" href="/gallery/1/">
+              <span class="swatch swatch--1" data-shared="item-1" data-flip-id="item-1"></span>
+              <span class="gallery-caption">Item 1 — Archive reader</span>
+            </a>
+          </li>
+          <li>
+            <a class="gallery-item" data-intro data-testid="gallery-item-2" href="/gallery/2/">
+              <span class="swatch swatch--2" data-shared="item-2" data-flip-id="item-2"></span>
+              <span class="gallery-caption">Item 2 — Booking flow</span>
+            </a>
+          </li>
+          <li>
+            <a class="gallery-item" data-intro data-testid="gallery-item-3" href="/gallery/3/">
+              <span class="swatch swatch--3" data-shared="item-3" data-flip-id="item-3"></span>
+              <span class="gallery-caption">Item 3 — Documentation search</span>
+            </a>
+          </li>
+        </ul>
+        <section class="notes notes--gallery" data-intro aria-labelledby="notes-heading">
+          <h2 id="notes-heading">Notes on reserved space</h2>
+          <p>Every picture on this page has its box before it has its pixels. The grid is laid out from plain CSS, so a slow image never moves a caption, and a thumbnail that travels to its own page leaves from exactly where it sat.</p>
+          <p>The scroll you are using now is eased by a scroller the shell owns. Pages never create or stop it; the controller holds it still while a page leaves and hands it back once the next one has settled.</p>
+          <p>Back and forward return to the position you left, not to the top and not to where the other page was. The next turn of the wheel continues from there.</p>
+          <p>Nothing below this line animates on arrival. It is here so the page has somewhere to go.</p>
+        </section>
+      </article>
+    </main>
+
+    <!-- Persistent shell: the curtain lives beside the route container and survives every swap. -->
+    <div class="curtain" data-curtain data-curtain-phase="idle" aria-hidden="true">
+      <div class="curtain-panel" data-curtain-panel></div>
+      <div class="curtain-panel" data-curtain-panel></div>
+      <div class="curtain-panel" data-curtain-panel></div>
+    </div>
+
+    <footer class="site-footer" data-chrome="footer" data-chrome-phase="initial" data-chrome-intro="">
+      <div class="shell">
+        <p>&copy; <span data-year>2025</span> Animaxxing. Built to be read first.</p>
+      </div>
+    </footer>
+  </body>
+</html>

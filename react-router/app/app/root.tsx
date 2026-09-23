@@ -1,4 +1,5 @@
 import { ChromeMotion } from "./motion/ChromeMotion";
+import { Curtain } from "./motion/Curtain";
 import {
   Link,
   Links,
@@ -45,6 +46,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
  * `prefetch="intent"` matters on the blocker path. Loaders and route modules
  * are only fetched after `proceed()`, so without it the end state would sit
  * under the cover waiting on the network.
+ *
+ * The boundary also owns the document's one smooth scroller and the curtain,
+ * rendered here in the shell after the route area so it survives the swap it
+ * hides. The window stays the scroll container: nothing here locks the
+ * viewport or scrolls an inner element.
  */
 export default function App() {
   return (
@@ -67,6 +73,8 @@ export default function App() {
       <RouteArea>
         <Outlet />
       </RouteArea>
+      {/* Persistent shell: the curtain lives beside the route area and survives every swap. */}
+      <Curtain />
       <footer className="site-footer" data-chrome="footer" data-chrome-phase="initial" data-chrome-intro="">
         <span>Three routes, one lifecycle.</span>
       </footer>

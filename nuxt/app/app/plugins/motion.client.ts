@@ -1,5 +1,5 @@
 import { useGSAP } from "~/composables/useGSAP";
-import { markHistoryNavigation, unlockNavigation } from "~/motion/page-transition";
+import { abandonNavigation, markHistoryNavigation, unlockNavigation } from "~/motion/page-transition";
 import { LIVE_ATTRIBUTE } from "~/motion/phases";
 
 /**
@@ -20,6 +20,22 @@ export default defineNuxtPlugin((nuxtApp) => {
   useRouter().options.history.listen?.((to) => markHistoryNavigation(to));
 
   // However a navigation ends -- landed, failed, redirected -- the
-  // one-at-a-time lock is released here.
-  nuxtApp.hook("page:loading:end", unlockNavigation);
+  // one-at-a-time lock is released here. A navigation that ends without a
+  // page (`page:loading:end` with no `page:finish`, and no later navigation
+  // still pending) also gives back what the outro held: the scroller and, if
+  // it closed, the curtain.
+  let pending = 0;
+  let arrived = true;
+  nuxtApp.hook("page:loading:start", () => {
+    pending += 1;
+    arrived = false;
+  });
+  nuxtApp.hook("page:finish", () => {
+    arrived = true;
+  });
+  nuxtApp.hook("page:loading:end", () => {
+    pending = Math.max(0, pending - 1);
+    unlockNavigation();
+    if (pending === 0 && !arrived) abandonNavigation();
+  });
 });

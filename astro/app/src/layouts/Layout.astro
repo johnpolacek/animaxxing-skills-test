@@ -1,11 +1,13 @@
 ---
 import { ClientRouter } from "astro:transitions";
 import "../styles/global.css";
+// The smooth scroller's stylesheet, once, from the shell's global styles.
+import "lenis/dist/lenis.css";
 
 interface Props {
   title: string;
-  /** Which nav link is the current page. */
-  current: "home" | "about" | "work";
+  /** Which nav link is the current page; none for pages outside the top nav. */
+  current?: "home" | "about" | "work";
 }
 
 const { title, current } = Astro.props;
@@ -87,6 +89,25 @@ const links = [
     <main>
       <slot />
     </main>
+
+    <!--
+      Persistent shell: the curtain lives beside the route content, fixed over
+      the viewport, and crosses every swap alive through `transition:persist`,
+      so the one instance the layout module builds keeps pointing at real
+      panels. At rest the panels are hidden and take no pointer events.
+    -->
+    <div
+      class="curtain"
+      transition:persist="curtain"
+      transition:animate="none"
+      data-curtain
+      data-curtain-phase="idle"
+      aria-hidden="true"
+    >
+      <div class="curtain-panel" data-curtain-panel></div>
+      <div class="curtain-panel" data-curtain-panel></div>
+      <div class="curtain-panel" data-curtain-panel></div>
+    </div>
 
     <footer class="site-footer" transition:persist="site-footer" transition:animate="none" data-chrome="footer" data-chrome-phase="initial" data-chrome-intro="">
       <div class="shell">

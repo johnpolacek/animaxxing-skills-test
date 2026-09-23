@@ -65,7 +65,7 @@ test('Chrome: brand enters from the left, then links scale in one at a time', as
   expect(Math.max(...frames.map((f) => f.footerY)) - Math.min(...frames.map((f) => f.footerY))).toBeLessThan(1);
 });
 
-test('Chrome: links and history preserve settled DOM without replaying motion', async ({ page }) => {
+test('Chrome: links and history preserve settled DOM without replaying motion', async ({ page, phases }) => {
   await page.goto('/');
   await settled(page);
   await expectSettledClean(page);
@@ -93,18 +93,26 @@ test('Chrome: links and history preserve settled DOM without replaying motion', 
     }
     expect(await page.evaluate(() => (window as any).__chromeMutations)).toEqual([]);
   };
+  // Some routers change the URL before swapping on history moves, so wait for the destination to settle.
+  const arrive = async (path: string, since: number) => {
+    await page.waitForURL(at(path));
+    await expect
+      .poll(() => phases.slice(since).some((e) => e.phase === 'settled' && e.path.replace(/\/$/, '') === path), { timeout: 5000 })
+      .toBe(true);
+    await verify();
+  };
+  let since = phases.length;
   await page.getByTestId('nav-about').click();
-  await page.waitForURL(at('/about'));
-  await verify();
+  await arrive('/about', since);
+  since = phases.length;
   await page.getByTestId('nav-work').click();
-  await page.waitForURL(at('/work'));
-  await verify();
+  await arrive('/work', since);
+  since = phases.length;
   await page.goBack();
-  await page.waitForURL(at('/about'));
-  await verify();
+  await arrive('/about', since);
+  since = phases.length;
   await page.goForward();
-  await page.waitForURL(at('/work'));
-  await verify();
+  await arrive('/work', since);
 });
 
 test('Chrome: navigation during the first fade does not restart it', async ({ page }) => {

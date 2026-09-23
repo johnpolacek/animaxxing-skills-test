@@ -12,6 +12,8 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as WorkRouteImport } from './routes/work'
+import { Route as GalleryIndexRouteImport } from './routes/gallery/index'
+import { Route as GalleryNRouteImport } from './routes/gallery/$n'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -28,35 +30,53 @@ const WorkRoute = WorkRouteImport.update({
   path: '/work',
   getParentRoute: () => rootRouteImport,
 } as any)
+const GalleryIndexRoute = GalleryIndexRouteImport.update({
+  id: '/gallery/',
+  path: '/gallery/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GalleryNRoute = GalleryNRouteImport.update({
+  id: '/gallery/$n',
+  path: '/gallery/$n',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/work': typeof WorkRoute
+  '/gallery/$n': typeof GalleryNRoute
+  '/gallery/': typeof GalleryIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/work': typeof WorkRoute
+  '/gallery/$n': typeof GalleryNRoute
+  '/gallery': typeof GalleryIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/work': typeof WorkRoute
+  '/gallery/$n': typeof GalleryNRoute
+  '/gallery/': typeof GalleryIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/about' | '/work'
+  fullPaths: '/' | '/about' | '/work' | '/gallery/$n' | '/gallery/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/about' | '/work'
-  id: '__root__' | '/' | '/about' | '/work'
+  to: '/' | '/about' | '/work' | '/gallery/$n' | '/gallery'
+  id: '__root__' | '/' | '/about' | '/work' | '/gallery/$n' | '/gallery/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
   WorkRoute: typeof WorkRoute
+  GalleryNRoute: typeof GalleryNRoute
+  GalleryIndexRoute: typeof GalleryIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -82,6 +102,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WorkRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/gallery/': {
+      id: '/gallery/'
+      path: '/gallery'
+      fullPath: '/gallery/'
+      preLoaderRoute: typeof GalleryIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/gallery/$n': {
+      id: '/gallery/$n'
+      path: '/gallery/$n'
+      fullPath: '/gallery/$n'
+      preLoaderRoute: typeof GalleryNRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -89,6 +123,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
   WorkRoute: WorkRoute,
+  GalleryNRoute: GalleryNRoute,
+  GalleryIndexRoute: GalleryIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

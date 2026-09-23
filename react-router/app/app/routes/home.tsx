@@ -1,4 +1,6 @@
+import { Link } from "react-router";
 import { PageMotion } from "../motion/PageMotion";
+import { TransitionLink } from "../motion/TransitionLink";
 
 export function meta() {
   return [{ title: "Lifecycle" }];
@@ -17,7 +19,17 @@ export default function HomeRoute() {
           Every page is laid out with ordinary CSS before anything moves, so the content is legible
           the moment the document arrives.
         </p>
-        <p data-intro>Start with the work, or read a little about how the studio came together.</p>
+        <p data-intro>
+          Start with the{" "}
+          <TransitionLink to="/work" transition="curtain" prefetch="intent" data-testid="curtain-link">
+            work
+          </TransitionLink>
+          , browse the{" "}
+          <Link to="/gallery" prefetch="intent" data-testid="home-gallery">
+            gallery
+          </Link>
+          , or read a little about how the studio came together.
+        </p>
       </main>
     </PageMotion>
   );

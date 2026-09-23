@@ -17,6 +17,10 @@
       Every page is laid out with ordinary CSS before anything moves, so the content is legible the
       moment the document arrives.
     </p>
-    <p data-intro>Start with the work, or read a little about how the studio came together.</p>
+    <p data-intro>
+      Start with the <a data-testid="curtain-link" data-transition="curtain" href="/work">work</a>,
+      browse the <a data-testid="home-gallery" href="/gallery">gallery</a>, or read a little about how
+      the studio came together.
+    </p>
   </main>
 </PageMotion>

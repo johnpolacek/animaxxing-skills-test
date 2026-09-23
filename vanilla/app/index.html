@@ -49,9 +49,16 @@
         <h1 data-intro>Motion that knows when to stop</h1>
         <p data-intro>Animaxxing is a small studio that builds interfaces for people who read them. We are interested in the quiet part of motion design: the moment a page arrives, the moment it leaves, and the half second in between where most of the damage gets done.</p>
         <p data-intro>Every screen here runs the same lifecycle. Content is laid out first and animated second, so nothing jumps, nothing flashes, and nothing is hidden from a reader whose script never loaded.</p>
-        <p data-intro>Have a look at the work, or read about how the studio got here.</p>
+        <p data-intro>Have a look at the <a data-testid="curtain-link" data-transition="curtain" href="/work/">work</a>, browse the <a data-testid="home-gallery" href="/gallery/">gallery</a>, or read about how the studio got here.</p>
       </article>
     </main>
+
+    <!-- Persistent shell: the curtain lives beside the route container and survives every swap. -->
+    <div class="curtain" data-curtain data-curtain-phase="idle" aria-hidden="true">
+      <div class="curtain-panel" data-curtain-panel></div>
+      <div class="curtain-panel" data-curtain-panel></div>
+      <div class="curtain-panel" data-curtain-panel></div>
+    </div>
 
     <footer class="site-footer" data-chrome="footer" data-chrome-phase="initial" data-chrome-intro="">
       <div class="shell">

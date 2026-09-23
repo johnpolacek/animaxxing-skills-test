@@ -1,9 +1,12 @@
 import { ChromeMotion } from "@/components/motion/ChromeMotion";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { Curtain } from "@/components/motion/Curtain";
 import { MotionScript } from "@/components/motion/MotionScript";
 import { RouteArea, RouteTransition } from "@/components/motion/RouteTransition";
 import { TransitionLink } from "@/components/motion/TransitionLink";
+// The smooth scroller's stylesheet, once, from the shell.
+import "lenis/dist/lenis.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -38,6 +41,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <footer className="site-footer" data-chrome="footer" data-chrome-phase="initial" data-chrome-intro="">
             <span>Three routes, one lifecycle.</span>
           </footer>
+          {/* Persistent shell: the curtain lives beside the route area and survives every swap. */}
+          <Curtain />
         </RouteTransition>
       </body>
     </html>

@@ -9,5 +9,8 @@ export function getRouter() {
     // already in the cache by then, so the end state is not left on screen.
     defaultPreload: "intent",
     scrollRestoration: true,
+    // The router's own scroll lands as a jump, in `onRendered`, and the smooth
+    // scroller adopts it there; nothing eases under an intro.
+    scrollRestorationBehavior: "instant",
   });
 }

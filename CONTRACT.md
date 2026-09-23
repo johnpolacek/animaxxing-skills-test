@@ -48,3 +48,40 @@ The common first-load suite asserts actual route HTML and native links with Java
 `vanilla/app/recovery/` is an isolated, production-built fault fixture using GSAP and SplitText. Its specs cover setup throws before/after styles and splits, a throwing disposer, an entrance callback failure, cancelled delayed writes, stalled/rejected font and media preparation, late bundles, no-flash success longer than the initialization budget, reduced motion, duplicate setup, and navigation during preparation. Faults are controlled inputs; font/media promises are stubbed. These tests validate the recovery contract, not every framework adapter or every motion recipe.
 
 Remaining adapter coverage: partial-setup recovery and stale promises in each framework's actual controller; hydration replay, streamed/cached routes, persisted Astro islands, Vue hook cancellation, and Svelte reused pages. Keep the existing lifecycle/history/chrome suites. Production indexing, field LCP, bfcache, and suspended-tab behavior need separate verification.
+
+## Transition archetypes
+
+The reference implementations also exercise the archetypes in each skill's `references/smooth-scroll.md` and `references/transition-archetypes.md`: one smooth scroller per document, a curtain navigation, and a shared-element morph. `shared/archetypes.ts` asserts them. They are not part of `TASK.md`, so the archetype specs skip when `APP_DIR` points at an agent-built app. The specs compare routes without a trailing slash, so `/gallery/` and `/gallery` are the same route.
+
+### Pages
+
+- `/gallery`: a page like the others (`[data-page]`, `data-phase`, `[data-intro]`) with the heading "Gallery". It holds three links, `data-testid="gallery-item-1"` to `gallery-item-3`, pointing at `/gallery/1` to `/gallery/3`. Each link contains a thumbnail `[data-shared="item-N"]` about 160 × 100 px, which is not an intro target. Below the grid, enough content to scroll at least 2000 px past the viewport.
+- `/gallery/N` for N = 1, 2, 3: heading "Item N", a hero `[data-shared="item-N"][data-shared-hero]` about 480 × 300 px, clearly away from where the thumbnail sat, and a link `data-testid="gallery-back"` to `/gallery`. The hero is visible at its final size before the intro starts; it is neither an intro target nor hidden before paint. Below it, enough content to scroll at least 1000 px past the viewport, so a push from here to `/gallery` lands at the top by decision rather than because the destination cannot scroll.
+- On `/`: keep the page within a 720 px viewport, since the chrome spec compares footer positions across pages. A link `data-testid="home-gallery"` to `/gallery` (ordinary transition) and a link `data-testid="curtain-link"` to `/work` that takes the curtain transition. Neither is a top nav link; the header keeps its three.
+
+The window must be the document's scroll container: Lenis eases `window.scrollY`, and the specs read it. A shell that locks the viewport and scrolls an inner `main` does not meet this section.
+
+### Smooth scroller
+
+- Lenis scrolls the window, created once per document from the persistent shell. `html` carries Lenis's `lenis` class while it runs. Under reduced motion, and without JavaScript, there is no scroller and no `lenis` class.
+- Wheel input eases: part of the way after a few frames, all of it once settled.
+- The page cannot be scrolled from `outro` through `end`, until the swap replaces it.
+- A new page (push) settles at the top, and the next wheel scrolls from there.
+- Back and forward land on the position the page had when it was left, and the next wheel continues from there.
+
+### Curtain
+
+- `[data-curtain]` in the persistent shell, outside every `[data-page]`, fixed over the viewport, `aria-hidden="true"`, holding one or more `[data-curtain-panel]`. It reports `data-curtain-phase`: `idle`, `covering`, `covered`, `revealing`. At `idle` every panel computes `visibility: hidden`.
+- The curtain link: the current page goes to `outro` and the curtain to `covering`, then `covered`, with the viewport's center covered by a panel, all before the URL changes. The incoming page mounts under the curtain and is not `settled` before the curtain reaches `revealing`. The curtain returns to `idle` and the incoming page reaches `settled`.
+- While `covered` or `revealing`, a click at the viewport's center reaches no page or chrome element: it lands on a panel, or on the document root while a view transition's frames run. `covered` may last a single frame when the fetch is already back, so the specs watch it per frame and through a `MutationObserver`, never on an assertion's polling schedule.
+- Header and footer keep their DOM nodes. The curtain is the one transition that passes over the chrome; it never animates, restyles, or replaces the chrome's nodes.
+- Back and forward never leave `idle`.
+- Reduced motion: no panel is ever visible, and the navigation completes.
+
+### Shared element
+
+- The specs observe `data-shared`; GSAP Flip matches counterparts by `data-flip-id`, so the thumbnail and its hero carry both, with the same value.
+- Clicking `gallery-item-N` on a settled `/gallery`: the page goes to `outro`, the other intro targets leave, and the clicked thumbnail stays visible through `end`. No curtain.
+- On `/gallery/N`, the hero's first visible box is near the thumbnail's box, then it moves to its own. At `settled` it sits in its CSS box with no inline `transform`, `opacity`, or `visibility`.
+- Back to `/gallery` morphs nothing: every thumbnail's first visible box is its own.
+- Reduced motion: the hero's first visible box is its final box.

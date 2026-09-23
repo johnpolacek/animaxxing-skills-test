@@ -1,3 +1,4 @@
+import { useMatch } from "@tanstack/react-router";
 import { useRef, type ReactNode } from "react";
 import { gsap, useGSAP } from "./gsap";
 import {
@@ -8,7 +9,7 @@ import {
   prefersReducedMotion,
   type Phase,
 } from "./phases";
-import { useRouteTransition, type PageController } from "./RouteTransition";
+import { useRouteTransition, type LeaveOptions, type PageController } from "./RouteTransition";
 
 /** Intro: 0.4s of travel plus stagger steps of 0.1s is the ~600ms asked for. */
 const INTRO_DURATION = 0.4;
@@ -26,7 +27,10 @@ const OUTRO_STAGGER = 0.03;
  */
 export function PageMotion({ children }: { children: ReactNode }) {
   const root = useRef<HTMLDivElement>(null);
-  const { registerPage, claimFocus } = useRouteTransition();
+  const { registerPage, pageSettled, claimFocus, arrival } = useRouteTransition();
+  // The presented match, not `useLocation`, which moves to the destination
+  // before the new page mounts.
+  const path = useMatch({ strict: false, select: (match) => match.pathname });
 
   useGSAP(
     (_context, contextSafe) => {
@@ -54,13 +58,18 @@ export function PageMotion({ children }: { children: ReactNode }) {
       // failsafe already showed the content, and hiding it again to play an
       // intro would be worse than arriving settled.
       const instant = prefersReducedMotion() || motionReleased();
-      gsap.set(introTargets, instant ? { autoAlpha: 1, y: 0 } : { autoAlpha: 0, y: INTRO_RISE });
+      // Back and forward are intro-only and without travel: the reader is
+      // returning to something they have already seen, and every box, a
+      // gallery thumbnail included, is its own from the first visible frame.
+      const rise = arrival() === "fresh" ? INTRO_RISE : 0;
+      gsap.set(introTargets, instant ? { autoAlpha: 1, y: 0 } : { autoAlpha: 0, y: rise });
 
       const settle = () => {
         intro = null;
         // Settled is CSS, not a held timeline: drop every temporary style.
         gsap.set(introTargets, { clearProps: "all" });
         setPhase("settled");
+        pageSettled(controller);
         // TanStack Router moves no focus, so after a client navigation it sits
         // on a link that just unmounted and falls to <body>. Claim it only
         // then, and never from a control the reader is using.
@@ -95,7 +104,7 @@ export function PageMotion({ children }: { children: ReactNode }) {
       // The outro is built from the blocker, long after this setup ran, so it
       // goes through contextSafe to stay inside this component's context and be
       // reverted with it.
-      const leave = safe((done: () => void) => {
+      const leave = safe((done: () => void, { keep }: LeaveOptions = {}) => {
         // An intro is not the inverse of the outro, so kill it and leave from
         // whatever is on screen rather than reversing.
         cancelPending?.();
@@ -104,8 +113,11 @@ export function PageMotion({ children }: { children: ReactNode }) {
         intro = null;
 
         // Queried at leave time, so anything that arrived after setup leaves
-        // with the page.
-        const outroTargets = Array.from(el.querySelectorAll<HTMLElement>("[data-intro]"));
+        // with the page. A kept element, and anything holding it, stays lit
+        // through the swap: the shared element the next page morphs from.
+        const outroTargets = Array.from(el.querySelectorAll<HTMLElement>("[data-intro]")).filter(
+          (target) => !keep || !(target.contains(keep) || keep.contains(target)),
+        );
         setPhase("outro");
 
         // Still mounted, still laid out, no longer interactive: CSS keys that
@@ -132,14 +144,14 @@ export function PageMotion({ children }: { children: ReactNode }) {
           });
       });
 
-      const controller: PageController = { root: el, leave };
+      const controller: PageController = { root: el, path, leave };
       const unregister = registerPage(controller);
       return () => {
         cancelPending?.();
         unregister();
       };
     },
-    { scope: root, dependencies: [registerPage, claimFocus] },
+    { scope: root, dependencies: [registerPage, pageSettled, claimFocus, arrival] },
   );
 
   return (

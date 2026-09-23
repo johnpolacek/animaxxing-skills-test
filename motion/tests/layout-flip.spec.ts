@@ -119,3 +119,27 @@ test("reverting a Flip mid-way lands the new layout, clears its styles, and comp
   expect(result.fired).toBe(1);
   expect(result.styles.every((transform) => transform === "")).toBe(true);
 });
+
+test("a shared element morph starts where it was on screen after the router scrolls", async ({ open }) => {
+  const page = await open("layout-flip");
+  const result = await page.evaluate(async () => {
+    const { LF } = window as any;
+    document.body.style.minHeight = "3000px";
+    window.scrollTo(0, 120);
+    const thumb = document.getElementById("thumb")!;
+    const seen = thumb.getBoundingClientRect();
+    const state = LF.captureShared(thumb);
+    // The router resets scroll to the top before the incoming page plays its morph.
+    window.scrollTo(0, 0);
+    thumb.style.visibility = "hidden";
+    const hero = document.getElementById("hero")!;
+    hero.classList.remove("hidden");
+    LF.playShared(state, hero, { duration: 0.6 });
+    LF.playShared(state, hero, { duration: 0.6 });
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    const first = hero.getBoundingClientRect();
+    return { seenTop: seen.top, firstTop: first.top, firstLeft: first.left, seenLeft: seen.left };
+  });
+  expect(Math.abs(result.firstTop - result.seenTop), JSON.stringify(result)).toBeLessThan(25);
+  expect(Math.abs(result.firstLeft - result.seenLeft)).toBeLessThan(25);
+});
