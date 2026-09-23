@@ -14,20 +14,55 @@ const out = path.join(here, ".build");
 const src = path.join(out, "src");
 mkdirSync(src, { recursive: true });
 
-/** Every ```ts block except usage examples, which start with "// Example". */
+/**
+ * Splits a recipe into modules. Sections headed with a file name ("## field.ts")
+ * become that module; every other TypeScript block joins the recipe's own
+ * module. Usage blocks (under "## Wiring" or starting "// Example") are skipped.
+ */
 function extract(recipe) {
   const markdown = readFileSync(path.join(recipes, `${recipe}.md`), "utf8");
-  const blocks = [...markdown.matchAll(/^```ts\n([\s\S]*?)^```$/gm)].map((match) => match[1]);
-  return blocks.filter((block) => !block.trimStart().startsWith("// Example")).join("\n");
+  const modules = new Map();
+  let file = recipe;
+  let skip = false;
+  for (const section of markdown.split(/^(?=## )/m)) {
+    const heading = section.match(/^## (.+)$/m)?.[1].trim() ?? "";
+    if (/^[\w-]+\.ts$/.test(heading)) file = heading.slice(0, -3);
+    skip = heading === "Wiring";
+    if (skip) continue;
+    for (const [, code] of section.matchAll(/^```ts\n([\s\S]*?)^```$/gm)) {
+      if (code.trimStart().startsWith("// Example")) continue;
+      modules.set(file, `${modules.get(file) ?? ""}${code}\n`);
+    }
+  }
+  return modules;
 }
 
-const RECIPES = ["scroll-effects", "pointer-effects", "svg-effects", "counters-and-marquees"];
-for (const recipe of RECIPES) writeFileSync(path.join(src, `${recipe}.ts`), extract(recipe));
+const RECIPES = [
+  "scroll-effects",
+  "pointer-effects",
+  "svg-effects",
+  "counters-and-marquees",
+  "split-entrances",
+  "route-letters",
+  "speak-in",
+  "wave",
+  "blast-off",
+  "particle-field",
+  "particle-effects",
+];
+const files = [];
+for (const recipe of RECIPES) {
+  for (const [name, code] of extract(recipe)) {
+    const file = path.join(src, `${name}.ts`);
+    writeFileSync(file, code);
+    files.push(file);
+  }
+}
 
 execFileSync(
   path.join(here, "node_modules/.bin/tsc"),
   ["--noEmit", "--strict", "--noUnusedLocals", "--target", "es2021", "--lib", "es2021,dom,dom.iterable",
-    "--moduleResolution", "bundler", "--module", "esnext", "--skipLibCheck", ...RECIPES.map((r) => path.join(src, `${r}.ts`))],
+    "--moduleResolution", "bundler", "--module", "esnext", "--skipLibCheck", ...files],
   { stdio: "inherit", cwd: here },
 );
 
@@ -36,6 +71,8 @@ const ENTRIES = {
   "scroll-effects": `import * as S from "./scroll-effects"; import gsap from "gsap"; import { ScrollTrigger } from "gsap/ScrollTrigger"; Object.assign(window, { S, gsap, ST: ScrollTrigger });`,
   "pointer-effects": `import * as P from "./pointer-effects"; import gsap from "gsap"; Object.assign(window, { P, gsap });`,
   "svg-counters": `import * as V from "./svg-effects"; import * as C from "./counters-and-marquees"; import gsap from "gsap"; Object.assign(window, { V, C, gsap });`,
+  text: `import * as SE from "./split-entrances"; import * as RL from "./route-letters"; import * as SI from "./speak-in"; import * as W from "./wave"; import * as B from "./blast-off"; import gsap from "gsap"; Object.assign(window, { SE, RL, SI, W, B, gsap });`,
+  particles: `import * as A from "./attach"; import * as FX from "./particle-effects"; import gsap from "gsap"; Object.assign(window, { A, FX, gsap });`,
 };
 for (const [name, code] of Object.entries(ENTRIES)) {
   const entry = path.join(src, `${name}.entry.ts`);

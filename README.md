@@ -72,4 +72,4 @@ pnpm test:motion
 SKILLS_REPO=/path/to/animaxxing-skills pnpm test:motion
 ```
 
-Covered: scroll effects, pointer effects, SVG effects, and counters and marquees. Each spec checks the effect's visible behavior, reduced motion, idempotent teardown that restores the original markup and inline styles, and rollback when setup throws. The earlier text and particle recipes are still verified in the [Animaxxing](https://github.com/johnpolacek/animaxxing) demo.
+Every recipe is covered: split entrances, route letters, speak-in, wave, blast-off, particle field and effects, scroll, pointer, SVG, and counters and marquees. Multi-module recipes are split on their `## file.ts` headings; `## Wiring` blocks and `// Example` blocks are usage and are skipped. Each spec checks visible behavior, completion callbacks, reduced motion, and teardown that restores the original markup and inline styles. The newer recipes also check rollback when setup throws. The [Animaxxing](https://github.com/johnpolacek/animaxxing) demo remains the reference for how the recipes look with `style-animaxxing`.
