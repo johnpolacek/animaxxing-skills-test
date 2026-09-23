@@ -8,6 +8,11 @@
     "skipLibCheck": true,
     "types": [
       "node"
+    ],
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
     ]
   },
   "include": [
@@ -25,6 +30,9 @@
     "sveltekit/playwright.config.ts",
     "nuxt/playwright.config.ts",
     "react-router/playwright.config.ts",
-    "tanstack/playwright.config.ts"
+    "tanstack/playwright.config.ts",
+    "motion/tests",
+    "motion/playwright.config.ts",
+    "motion/global-setup.ts"
   ]
 }

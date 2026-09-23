@@ -8,3 +8,4 @@ blob-report/
 .DS_Store
 *.log
 .env*
+motion/.build/

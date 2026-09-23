@@ -6,3 +6,4 @@ packages:
   - "nuxt/*"
   - "react-router/*"
   - "tanstack/*"
+  - "motion"

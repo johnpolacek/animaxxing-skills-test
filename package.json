@@ -3,7 +3,7 @@
   "private": true,
   "packageManager": "pnpm@10.6.4",
   "scripts": {
-    "test": "pnpm test:vanilla && pnpm test:nextjs && pnpm test:astro && pnpm test:sveltekit && pnpm test:nuxt && pnpm test:react-router && pnpm test:tanstack",
+    "test": "pnpm test:vanilla && pnpm test:nextjs && pnpm test:astro && pnpm test:sveltekit && pnpm test:nuxt && pnpm test:react-router && pnpm test:tanstack && pnpm test:motion",
     "test:vanilla": "playwright test -c vanilla/playwright.config.ts",
     "test:nextjs": "playwright test -c nextjs/playwright.config.ts",
     "test:astro": "playwright test -c astro/playwright.config.ts",
@@ -11,6 +11,7 @@
     "test:nuxt": "playwright test -c nuxt/playwright.config.ts",
     "test:react-router": "playwright test -c react-router/playwright.config.ts",
     "test:tanstack": "playwright test -c tanstack/playwright.config.ts",
+    "test:motion": "playwright test -c motion/playwright.config.ts",
     "eval": "bash scripts/eval.sh"
   },
   "devDependencies": {

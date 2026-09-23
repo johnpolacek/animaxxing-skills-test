@@ -19,6 +19,7 @@ animaxxing-skills-test/
   nuxt/                  gsap-nuxt
   react-router/          gsap-react-router
   tanstack/              gsap-tanstack-router
+  motion/                Recipe suite for the animaxxing motion skill
 ```
 
 Set `VANILLA_TEST_PORT` to override vanilla’s port if another local app occupies it.
@@ -33,7 +34,7 @@ pnpm exec playwright install chromium
 pnpm test
 ```
 
-Or one framework: `pnpm test:vanilla`, `pnpm test:nextjs`, `pnpm test:astro`, `pnpm test:sveltekit`, `pnpm test:nuxt`, `pnpm test:react-router`, `pnpm test:tanstack`.
+Or one suite: `pnpm test:motion`, `pnpm test:vanilla`, `pnpm test:nextjs`, `pnpm test:astro`, `pnpm test:sveltekit`, `pnpm test:nuxt`, `pnpm test:react-router`, `pnpm test:tanstack`.
 
 ## Verify a skill end to end
 
@@ -61,3 +62,14 @@ pnpm test:vanilla recovery.spec.ts
 ```
 
 This fixture is excluded from agent-generated `APP_DIR` evaluations. It does not certify recovery in the seven application controllers. See the coverage limits in [CONTRACT.md](CONTRACT.md).
+
+## Motion recipes
+
+`motion/` verifies the `animaxxing` motion skill's recipes directly. `motion/build.mjs` extracts each recipe's TypeScript from the skills checkout next to this repository, type-checks it under `strict`, and bundles it for small static fixtures. The specs then drive real input in Chromium: scrolling, mouse and touch pointers, keyboard focus, drags, and reduced motion.
+
+```bash
+pnpm test:motion
+SKILLS_REPO=/path/to/animaxxing-skills pnpm test:motion
+```
+
+Covered: scroll effects, pointer effects, SVG effects, and counters and marquees. Each spec checks the effect's visible behavior, reduced motion, idempotent teardown that restores the original markup and inline styles, and rollback when setup throws. The earlier text and particle recipes are still verified in the [Animaxxing](https://github.com/johnpolacek/animaxxing) demo.
