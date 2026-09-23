@@ -52,9 +52,15 @@ const RECIPES = [
   "smooth-scroll",
   "page-covers",
   "layout-flip",
+  "media-effects",
+  "component-motion",
+  "hover-effects",
 ];
+/** MOTION_ONLY=recipe[,recipe] builds and type-checks just those, so parallel work on one recipe cannot break another's run. */
+const only = process.env.MOTION_ONLY?.split(",").map((name) => name.trim()).filter(Boolean);
+const selected = only ? RECIPES.filter((recipe) => only.includes(recipe)) : RECIPES;
 const files = [];
-for (const recipe of RECIPES) {
+for (const recipe of selected) {
   for (const [name, code] of extract(recipe)) {
     const file = path.join(src, `${name}.ts`);
     writeFileSync(file, code);
@@ -79,8 +85,19 @@ const ENTRIES = {
   "smooth-scroll": `import * as SC from "./scroll-controls"; import * as L from "./lenis-scroll"; import * as SM from "./smoother-scroll"; import gsap from "gsap"; import { ScrollTrigger } from "gsap/ScrollTrigger"; Object.assign(window, { SC, L, SM, gsap, ST: ScrollTrigger });`,
   "page-covers": `import * as PC from "./page-covers"; import gsap from "gsap"; Object.assign(window, { PC, gsap });`,
   "layout-flip": `import * as LF from "./layout-flip"; import gsap from "gsap"; import { Flip } from "gsap/Flip"; Object.assign(window, { LF, gsap, Flip });`,
+  "media-effects": `import * as ME from "./media-effects"; import gsap from "gsap"; import { ScrollTrigger } from "gsap/ScrollTrigger"; Object.assign(window, { ME, gsap, ST: ScrollTrigger });`,
+  "component-motion": `import * as CM from "./component-motion"; import gsap from "gsap"; Object.assign(window, { CM, gsap });`,
+  "hover-effects": `import * as HE from "./hover-effects"; import gsap from "gsap"; Object.assign(window, { HE, gsap });`,
+};
+/** Entries whose recipes were built; the original five bundle several recipes each. */
+const ENTRY_RECIPES = {
+  "scroll-effects": ["scroll-effects"], "pointer-effects": ["pointer-effects"], "svg-counters": ["svg-effects", "counters-and-marquees"],
+  text: ["split-entrances", "route-letters", "speak-in", "wave", "blast-off"], particles: ["particle-field", "particle-effects"],
+  "smooth-scroll": ["smooth-scroll"], "page-covers": ["page-covers"], "layout-flip": ["layout-flip"],
+  "media-effects": ["media-effects"], "component-motion": ["component-motion"], "hover-effects": ["hover-effects"],
 };
 for (const [name, code] of Object.entries(ENTRIES)) {
+  if (!ENTRY_RECIPES[name].every((recipe) => selected.includes(recipe))) continue;
   const entry = path.join(src, `${name}.entry.ts`);
   writeFileSync(entry, code);
   await build({ entryPoints: [entry], bundle: true, format: "iife", outfile: path.join(out, `${name}.js`), logLevel: "warning", nodePaths: [path.join(here, "node_modules")] });

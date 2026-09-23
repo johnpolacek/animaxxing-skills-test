@@ -1,0 +1,38 @@
+<!doctype html><html><head><style>
+body{margin:0;font:16px sans-serif}
+section{position:relative}
+.frame{margin:0;width:200px;height:120px}.frame img{display:block;width:100%;height:100%;object-fit:cover}
+#f1{position:absolute;left:20px;top:20px}#f2{position:absolute;left:260px;top:20px}#f3{position:absolute;left:20px;top:200px}
+#list{position:absolute;left:20px;top:300px;margin:0;padding:0;list-style:none;width:200px}
+#list a{display:block;height:40px;line-height:40px;background:#eee;margin-bottom:10px;color:#000}
+.preview{position:fixed;left:0;top:0;width:120px;height:90px;overflow:hidden;pointer-events:none;visibility:hidden}
+#vid,#cv{position:sticky;top:0;display:block;width:200px;height:100px;background:#000}
+</style></head><body>
+<script>
+  // Tiny solid-color SVGs stand in for photos; the sequence is eight frames from red to blue.
+  window.svg = (fill) => "data:image/svg+xml," + encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='40' height='20'><rect width='40' height='20' fill='${fill}'/></svg>`);
+  window.FRAMES = Array.from({ length: 8 }, (_, i) => svg(`rgb(${i * 32},0,${255 - i * 32})`));
+</script>
+<section id="s1" style="height:700px">
+  <figure class="frame" id="f1" style="border-radius: 4px"><img id="i1" alt="One" style="transform: translateZ(0px)"></figure>
+  <figure class="frame" id="f2"><img id="i2" alt="Two"></figure>
+  <ul id="list">
+    <li><a href="#p1" id="l1">One</a></li>
+    <li><a href="#p2" id="l2">Two</a></li>
+    <li><a href="#p3" id="l3">Three</a></li>
+  </ul>
+  <div class="preview" id="pv" aria-hidden="true"></div>
+</section>
+<section id="s2" style="height:700px"><figure class="frame" id="f3"><a href="#g" id="g"><img id="i3" alt="Three"></a></figure></section>
+<section id="vsec" style="height:2100px"><video id="vid" muted playsinline></video></section>
+<section id="qsec" style="height:2100px"><canvas id="cv"></canvas></section>
+<div style="height:700px"></div>
+<script>
+  document.getElementById("i1").src = svg("#f00");
+  document.getElementById("i2").src = svg("#0f0");
+  document.getElementById("i3").src = svg("#00f");
+  document.getElementById("l1").dataset.preview = svg("#f00");
+  document.getElementById("l2").dataset.preview = svg("#0f0");
+  document.getElementById("l3").dataset.preview = svg("#00f");
+</script>
+<script src="../.build/media-effects.js"></script></body></html>
