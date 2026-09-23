@@ -71,13 +71,24 @@ test("countUp keeps formatting, reserves width, reads the final value, and ends 
     (window as any).cs = list.map((id) => (window as any).C.countUp(document.getElementById(id), { duration: 0.6 }));
   }, ids);
   await page.waitForTimeout(200);
-  const mid = await page.evaluate((list) => list.map((id) => [document.getElementById(id)!.textContent, document.getElementById(id)!.getAttribute("aria-label")]), ids);
+  // [counting digits, text left for assistive technology] per figure.
+  const mid = await page.evaluate(
+    (list) =>
+      list.map((id) => {
+        const el = document.getElementById(id)!;
+        const shown = el.querySelector('[aria-hidden="true"]');
+        const spoken = Array.from(el.childNodes).filter((node) => node !== shown).map((node) => node.textContent).join("");
+        return [shown?.textContent ?? null, spoken];
+      }),
+    ids,
+  );
   expect(mid[0][0]).not.toBe("12,480");
   expect(mid[0][1]).toBe("12,480");
   expect(mid[1][0]).toMatch(/^\d+\.\d%$/);
+  expect(mid[1][1]).toBe("98.6%");
   expect(mid[2][0]).toMatch(/^\$\d\.\dM$/);
   expect(mid[3][0]).toMatch(/\.\d\d$/);
-  expect(mid[4]).toEqual(["n/a", null]);
+  expect(mid[4]).toEqual([null, "n/a"]);
   expect(Math.abs((await left()) - before)).toBeLessThan(0.5);
 
   await page.waitForTimeout(700);
@@ -85,8 +96,59 @@ test("countUp keeps formatting, reserves width, reads the final value, and ends 
   await page.evaluate(() => (window as any).cs.forEach((count: any) => count.revert()));
   for (const id of ids) {
     expect(await style(page, `#${id}`)).toBe("");
-    expect(await page.$eval(`#${id}`, (el) => el.hasAttribute("aria-label"))).toBe(false);
+    expect(await page.$eval(`#${id}`, (el) => el.children.length)).toBe(0);
   }
+});
+
+test("countUp reads three or more decimals and the locale's decimal mark", async ({ open }) => {
+  const page = await open("svg-counters");
+  const figures: Array<[string, string | undefined]> = [["99.999%", undefined], ["0.125", undefined], ["12.480", "de"], ["3,5 %", "de"]];
+  const mid = await page.evaluate((list) => {
+    const { C } = window as any;
+    return list.map(([text, locale]) => {
+      const span = document.createElement("span");
+      span.textContent = text;
+      document.body.append(span);
+      const count = C.countUp(span, { locale });
+      count.timeline.progress(0.3);
+      const shown = span.querySelector('[aria-hidden="true"]')?.textContent;
+      count.timeline.progress(1);
+      return [shown, span.textContent];
+    });
+  }, figures);
+  // Mid-count, each keeps the source's decimals and marks: no "99,999"-style grouping.
+  expect(mid[0][0]).toMatch(/^\d{2}\.\d{3}%$/);
+  expect(mid[1][0]).toMatch(/^0\.\d{3}$/);
+  expect(mid[2][0]).toMatch(/^\d{1,2}\.\d{3}$/);
+  expect(mid[3][0]).toMatch(/^\d,\d\s%$/);
+  expect(mid.map(([, final]) => final)).toEqual(figures.map(([text]) => text));
+});
+
+test("countUp falls back to the browser's locale when the page lang is malformed", async ({ open }) => {
+  const page = await open("svg-counters");
+  const result = await page.evaluate(() => {
+    document.documentElement.lang = "en_US";
+    const count = (window as any).C.countUp(document.getElementById("n2"));
+    count.timeline.progress(0.3);
+    const shown = document.querySelector('#n2 [aria-hidden="true"]')?.textContent;
+    count.revert();
+    return shown;
+  });
+  expect(result).toMatch(/^\d{1,2}\.\d%$/);
+});
+
+test("countUp leaves an existing aria-label alone", async ({ open }) => {
+  const page = await open("svg-counters");
+  const label = await page.evaluate(() => {
+    const el = document.getElementById("n1")!;
+    el.setAttribute("aria-label", "Twelve thousand");
+    const count = (window as any).C.countUp(el);
+    count.timeline.progress(0.5);
+    const during = el.getAttribute("aria-label");
+    count.revert();
+    return [during, el.getAttribute("aria-label")];
+  });
+  expect(label).toEqual(["Twelve thousand", "Twelve thousand"]);
 });
 
 test("reverting a count mid-way restores the source text", async ({ open }) => {

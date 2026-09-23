@@ -9,12 +9,35 @@ test("reveals items above and in view on a mid-page load, hides the rest", async
     (window as any).t = (window as any).S.revealOnScroll(".rv");
   });
   await page.waitForTimeout(900);
+  const opacity = await page.$$eval(".rv", (items) => items.map((el) => getComputedStyle(el).opacity));
+  expect(opacity).toEqual(["1", "1", "0"]);
+  // Waiting items are transparent, never visibility: hidden, so they stay reachable.
   const visibility = await page.$$eval(".rv", (items) => items.map((el) => getComputedStyle(el).visibility));
-  expect(visibility).toEqual(["visible", "visible", "hidden"]);
+  expect(visibility).toEqual(["visible", "visible", "visible"]);
   expect(await style(page, "#r1")).toBe("");
   await page.evaluate(() => (window as any).t());
   for (const id of ["#r0", "#r1", "#r2"]) expect(await style(page, id)).toBe("");
   expect(await page.evaluate(() => (window as any).ST.getAll().length)).toBe(0);
+});
+
+test("a waiting reveal stays in the accessibility tree and shows at once when focused", async ({ open }) => {
+  const page = await open("scroll-effects");
+  await page.evaluate(() => {
+    document.getElementById("r2")!.insertAdjacentHTML("beforeend", ' <a href="#z" id="rz">more</a>');
+    (window as any).t = (window as any).S.revealOnScroll(".rv");
+  });
+  await page.waitForTimeout(100);
+  expect(await page.$eval("#r2", (el) => getComputedStyle(el).opacity)).toBe("0");
+  const snapshot = await page.locator("#r2").ariaSnapshot();
+  expect(snapshot).toContain("more");
+  // Focus without scrolling, so only the focus path can reveal it.
+  const shown = await page.evaluate(() => {
+    document.getElementById("rz")!.focus({ preventScroll: true });
+    return getComputedStyle(document.getElementById("r2")!).opacity;
+  });
+  expect(shown).toBe("1");
+  await page.evaluate(() => (window as any).t());
+  expect(await style(page, "#r2")).toBe("");
 });
 
 test("scrubbed statement splits and reverts to the original markup", async ({ open }) => {
@@ -71,6 +94,25 @@ test("pinned scene tears down mid-pin with no leftover styles or spacing", async
   }
 });
 
+test("pinned scene teardown leaves other effects' inline values inside it alone", async ({ open }) => {
+  const page = await open("scroll-effects");
+  const other = await page.evaluate(() => {
+    const { S, gsap } = window as any;
+    const scene = document.getElementById("scene")!;
+    scene.insertAdjacentHTML("beforeend", '<span id="other">other</span>');
+    const teardown = S.pinnedScene(scene, (tl: any, root: HTMLElement) => {
+      const steps = Array.from(root.querySelectorAll("[data-step]"));
+      tl.to(steps[0], { autoAlpha: 0, y: -24 });
+    });
+    // Another effect, such as a magnetic button, writes after the scene is built.
+    gsap.set("#other", { x: 7 });
+    teardown();
+    return document.getElementById("other")!.style.transform;
+  });
+  expect(other).toContain("7px");
+  expect(await style(page, "[data-step]:nth-child(1)")).toBe("");
+});
+
 test("a throwing scene build rethrows and leaves no pin behind", async ({ open }) => {
   const page = await open("scroll-effects");
   const result = await page.evaluate(() => {
@@ -80,17 +122,19 @@ test("a throwing scene build rethrows and leaves no pin behind", async ({ open }
       });
       return "no throw";
     } catch (error) {
-      return `${(error as Error).message}|${(window as any).ST.getAll().length}|${!!document.querySelector(".pin-spacer")}`;
+      // The failed setup must not stay GSAP's current context.
+      return `${(error as Error).message}|${(window as any).ST.getAll().length}|${!!document.querySelector(".pin-spacer")}|${!!(window as any).gsap.context()}`;
     }
   });
-  expect(result).toBe("boom|0|false");
+  expect(result).toBe("boom|0|false|false");
 });
 
 test("horizontal run moves keyboard focus into view and restores the section", async ({ open }) => {
   const page = await open("scroll-effects");
   await page.evaluate(() => ((window as any).run = (window as any).S.horizontalRun(document.getElementById("run"), document.getElementById("track"))));
   expect(await page.$eval("#run", (el) => getComputedStyle(el).overflowX)).toBe("hidden");
-  await page.evaluate(() => document.getElementById("last")!.focus());
+  await page.keyboard.press("Tab");
+  await page.evaluate(() => document.getElementById("last")!.focus({ focusVisible: true } as FocusOptions));
   await page.waitForTimeout(900);
   const box = await page.evaluate(() => {
     const rect = document.getElementById("last")!.getBoundingClientRect();
@@ -103,6 +147,21 @@ test("horizontal run moves keyboard focus into view and restores the section", a
   expect(await page.$(".pin-spacer")).toBeNull();
   expect(await style(page, "#run")).toBe("");
   expect(await style(page, "#track")).toBe("");
+});
+
+test("clicking a card in a horizontal run does not scroll the page", async ({ open }) => {
+  const page = await open("scroll-effects");
+  await page.evaluate(() => {
+    (window as any).run = (window as any).S.horizontalRun(document.getElementById("run"), document.getElementById("track"));
+    window.scrollTo(0, document.getElementById("run")!.getBoundingClientRect().top + scrollY);
+  });
+  await page.waitForTimeout(300);
+  const before = await page.evaluate(() => scrollY);
+  const box = (await page.locator("#track a").nth(1).boundingBox())!;
+  await page.mouse.click(box.x + 20, box.y + 20);
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => scrollY)).toBe(before);
+  await page.evaluate(() => (window as any).run.revert());
 });
 
 test("reduced motion builds nothing except the progress rule", async ({ open }) => {
