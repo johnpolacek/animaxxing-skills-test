@@ -293,3 +293,62 @@ test("reduced motion: reveals complete unclipped, preview and video build nothin
   expect(await page.evaluate(() => (window as any).ST.getAll().length)).toBe(0);
   expect(await style(page, "#f1")).toBe("border-radius: 4px;");
 });
+
+test("the hover preview reappears at the pointer after leaving, not where it last hid", async ({ open, page: _page }) => {
+  const page = await open("media-effects");
+  await page.evaluate(() => ((window as any).hp = (window as any).ME.hoverPreview(document.getElementById("list"), document.getElementById("pv"))));
+  const first = (await page.locator("#l1").boundingBox())!;
+  const last = (await page.locator("#l3").boundingBox())!;
+  await page.mouse.move(first.x + 10, first.y + first.height / 2);
+  await page.mouse.move(first.x + 12, first.y + first.height / 2, { steps: 2 });
+  await page.waitForTimeout(600);
+  const settled = await page.evaluate(() => Number((window as any).gsap.getProperty("#pv", "y")));
+  const offset = settled - (first.y + first.height / 2);
+  await page.mouse.move(first.x + 10, 5);
+  await page.waitForTimeout(400);
+  // Re-enter far from where it hid, then take one small step.
+  const y = last.y + last.height / 2 + 200;
+  await page.mouse.move(last.x + 10, Math.min(y, last.y + last.height / 2));
+  await page.mouse.move(last.x + 12, Math.min(y, last.y + last.height / 2) + 1);
+  await page.waitForTimeout(60);
+  const now = await page.evaluate(() => Number((window as any).gsap.getProperty("#pv", "y")));
+  const expected = Math.min(y, last.y + last.height / 2) + 1 + offset;
+  expect(Math.abs(now - expected), `preview y ${now}, pointer target ${expected}`).toBeLessThan(20);
+  await page.evaluate(() => (window as any).hp());
+});
+
+test("a preview image that fails to load hides the preview instead of showing the last one", async ({ open }) => {
+  const page = await open("media-effects");
+  await page.evaluate(() => {
+    const list = document.getElementById("list")!;
+    const broken = document.getElementById("l3")!.cloneNode(true) as HTMLElement;
+    broken.id = "broken";
+    broken.dataset.preview = "data:image/png;base64,broken";
+    list.append(broken);
+    (window as any).hp = (window as any).ME.hoverPreview(list, document.getElementById("pv"));
+  });
+  const first = (await page.locator("#l1").boundingBox())!;
+  const broken = (await page.locator("#broken").boundingBox())!;
+  await page.mouse.move(first.x + 10, first.y + first.height / 2);
+  await page.mouse.move(first.x + 12, first.y + first.height / 2);
+  await page.waitForTimeout(500);
+  await page.mouse.move(broken.x + 10, broken.y + broken.height / 2, { steps: 3 });
+  await page.waitForTimeout(500);
+  const shown = await page.$$eval("#pv img", (layers) => layers.map((img) => Number(getComputedStyle(img).opacity)));
+  expect(Math.max(...shown), "the last item's image still shows").toBeLessThan(0.05);
+  await page.evaluate(() => (window as any).hp());
+});
+
+test("an image inside <picture> settles its <img>, which transforms can move", async ({ open }) => {
+  const page = await open("media-effects");
+  const scale = await page.evaluate(() => {
+    document.body.insertAdjacentHTML(
+      "beforeend",
+      '<div id="pf" style="width:200px;height:150px"><picture><img id="pimg" style="display:block;width:200px;height:150px" src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%222%22 height=%222%22/%3E"></picture></div>',
+    );
+    const reveal = (window as any).ME.imageReveal(document.getElementById("pf"));
+    reveal.timeline.pause(0);
+    return Number((window as any).gsap.getProperty("#pimg", "scale"));
+  });
+  expect(scale).toBeGreaterThan(1.05);
+});

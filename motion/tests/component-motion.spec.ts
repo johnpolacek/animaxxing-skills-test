@@ -506,3 +506,41 @@ test("a tab indicator setup that throws while measuring rolls back and rethrows"
   await page.evaluate(() => (window as any).CM.tabIndicator(document.getElementById("ind"), document.getElementById("tabs")).revert());
   expect(await style(page, "#ind")).toBe("");
 });
+
+test("a tab that grows as it is selected retargets the slide instead of cutting it short", async ({ open }) => {
+  const page = await open("component-motion");
+  await page.evaluate(() => ((window as any).ti = (window as any).CM.tabIndicator(document.getElementById("ind"), document.getElementById("tabs"), { duration: 0.4 })));
+  await page.waitForTimeout(100);
+  const t1 = await rect(page, "#t1");
+  await freeze(page);
+  await page.evaluate(async () => {
+    (window as any).ti.moveTo(document.getElementById("t3"));
+    // A bolder or larger selected label changes the tab's width in the same task.
+    document.getElementById("t3")!.style.width = "200px";
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  });
+  await advance(page, 0.1);
+  const t3 = await rect(page, "#t3");
+  const mid = await rect(page, "#ind");
+  expect(mid.left).toBeGreaterThan(t1.left + 1);
+  expect(mid.left, "the resize snapped the indicator to the end").toBeLessThan(t3.left - 5);
+  await release(page);
+  await page.waitForTimeout(700);
+  const landed = await rect(page, "#ind");
+  expect(Math.abs(landed.left - t3.left)).toBeLessThan(0.5);
+  expect(Math.abs(landed.width - t3.width)).toBeLessThan(0.5);
+  await page.evaluate(() => (window as any).ti.revert());
+});
+
+test("a disclosure pre-collapsed inline by the server opens to its content and stays open", async ({ open }) => {
+  const page = await open("component-motion");
+  const result = await page.evaluate(async () => {
+    document.body.insertAdjacentHTML("beforeend", '<div id="pre" style="height: 0px; overflow: hidden;"><p style="height:80px;margin:0">Server content</p></div>');
+    const panel = document.getElementById("pre")!;
+    const motion = (window as any).CM.disclosure(panel, { duration: 0.2 });
+    motion.open();
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    return { height: panel.getBoundingClientRect().height, style: panel.getAttribute("style") ?? "" };
+  });
+  expect(result).toEqual({ height: 80, style: "" });
+});
