@@ -29,6 +29,8 @@ export const INTRO_STAGGER = 0.1;
 /** Outro: 0.34s plus two 0.03s steps is the ~350ms asked for. */
 export const OUTRO_DURATION = 0.34;
 export const OUTRO_STAGGER = 0.03;
+/** Seconds before the outro's fade ends that the curtain starts to close over it. */
+export const CURTAIN_OVERLAP = 0.15;
 
 /** The mark the pre-paint script sets, and the CSS hiding rule is scoped to. */
 export const MOTION_ATTRIBUTE = "data-motion";

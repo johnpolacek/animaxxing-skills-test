@@ -10,7 +10,7 @@ import {
   prefersReducedMotion,
   type Phase,
 } from "./phases";
-import { useRouteTransition, type PageController } from "./RouteTransition";
+import { useRouteTransition, type LeaveOptions, type PageController } from "./RouteTransition";
 
 /** Intro: 0.4s of travel plus two 0.1s steps of stagger is the ~600ms asked for. */
 const INTRO_DURATION = 0.4;
@@ -28,7 +28,7 @@ const OUTRO_STAGGER = 0.03;
  */
 export function PageMotion({ children }: { children: ReactNode }) {
   const root = useRef<HTMLDivElement>(null);
-  const { registerPage, claimFocus } = useRouteTransition();
+  const { registerPage, arrival, pageSettled, claimFocus } = useRouteTransition();
 
   useGSAP(
     (_context, contextSafe) => {
@@ -55,13 +55,19 @@ export function PageMotion({ children }: { children: ReactNode }) {
       // failsafe already showed the content, and hiding it again to play an
       // intro would be worse than arriving settled.
       const instant = prefersReducedMotion() || motionReleased();
-      gsap.set(introTargets, instant ? { autoAlpha: 1, y: 0 } : { autoAlpha: 0, y: INTRO_RISE });
+      // Back and forward show a page the reader has already seen: it fades in
+      // where it is, so a shared element is in its own box from its first
+      // visible frame. A new visit rises.
+      const rise = arrival() === "fresh" ? INTRO_RISE : 0;
+      gsap.set(introTargets, instant ? { autoAlpha: 1, y: 0 } : { autoAlpha: 0, y: rise });
 
       const settle = () => {
         intro = null;
         // Settled is CSS, not a held timeline: drop every temporary style.
         gsap.set(introTargets, { clearProps: "all" });
         setPhase("settled");
+        // The shell hands the scroller back and forgets the navigation's handoff.
+        pageSettled(controller);
         // Only if the navigation left focus on <body>; never steal it from a
         // control the reader is using.
         if (claimFocus() && document.activeElement === document.body) {
@@ -95,7 +101,7 @@ export function PageMotion({ children }: { children: ReactNode }) {
       // The outro is built from an event handler, long after this setup ran, so
       // it goes through contextSafe to stay inside this component's context and
       // be reverted with it.
-      const leave = safe((done: () => void) => {
+      const leave = safe((done: () => void, { keep = null }: LeaveOptions = {}) => {
         // An intro is not the inverse of the outro, so kill it and leave from
         // whatever is on screen rather than reversing.
         cancelPending?.();
@@ -104,8 +110,11 @@ export function PageMotion({ children }: { children: ReactNode }) {
         intro = null;
 
         // Queried at leave time, so anything that arrived after setup leaves
-        // with the page.
-        const outroTargets = Array.from(el.querySelectorAll<HTMLElement>("[data-intro]"));
+        // with the page. A kept element, and anything holding it, stays lit
+        // through the swap: it is about to morph into the next page.
+        const outroTargets = Array.from(el.querySelectorAll<HTMLElement>("[data-intro]")).filter(
+          (target) => !keep || !(target.contains(keep) || keep.contains(target)),
+        );
         setPhase("outro");
 
         // Still mounted, still laid out, no longer interactive: CSS keys that
@@ -139,7 +148,7 @@ export function PageMotion({ children }: { children: ReactNode }) {
         unregister();
       };
     },
-    { scope: root, dependencies: [registerPage, claimFocus] },
+    { scope: root, dependencies: [registerPage, arrival, pageSettled, claimFocus] },
   );
 
   return (

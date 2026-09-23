@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { isNavigationLocked, lockNavigation } from "~/motion/page-transition";
+import { isNavigationLocked, lockNavigation, requestTransition, transitionFor } from "~/motion/page-transition";
 
 /*
  * `<NuxtLink>` with one navigation at a time.
@@ -12,9 +12,14 @@ import { isNavigationLocked, lockNavigation } from "~/motion/page-transition";
  * already replaced its pending location by then and cancels the navigation
  * that is waiting on our middleware. A click that never reaches the router
  * costs nothing.
+ *
+ * The link also says how it wants to travel. `transition="curtain"` closes the
+ * curtain over the outro; a link that carries a `[data-shared]` element asks
+ * for a morph into that element's counterpart on the next page. The outro,
+ * which runs in the middleware, reads the request.
  */
 defineOptions({ inheritAttrs: false });
-defineProps<{ to: string }>();
+const props = defineProps<{ to: string; transition?: "curtain" }>();
 
 function onClick(event: MouseEvent, navigate: () => void) {
   // Modified and non-primary clicks, and anything already handled, keep the
@@ -34,6 +39,7 @@ function onClick(event: MouseEvent, navigate: () => void) {
   // swallowed rather than queued.
   if (isNavigationLocked()) return;
   lockNavigation();
+  requestTransition(transitionFor(event.currentTarget as HTMLElement, props.transition));
   navigate();
 }
 </script>

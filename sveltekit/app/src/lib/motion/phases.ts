@@ -10,6 +10,13 @@
 
 export type Phase = "initial" | "intro" | "settled" | "outro" | "end";
 
+/**
+ * How a page arrives. `fresh` is a requested navigation or the first document:
+ * the full staggered rise. `return` is back or forward: intro only, without
+ * travel, because the reader is coming back to something already seen.
+ */
+export type Arrival = "fresh" | "return";
+
 /** Set by the inline pre-paint script in `src/app.html`. */
 export const MOTION_ATTRIBUTE = "data-motion";
 /** Set by the layout controller so the pre-paint failsafe stands down. */
@@ -28,11 +35,18 @@ export const OUTRO_DURATION = 0.34;
 export const OUTRO_STAGGER = 0.03;
 
 /**
+ * Seconds into the outro at which the curtain starts to close, so the panels
+ * arrive as the last item fades rather than after it.
+ */
+export const CURTAIN_LEAD = 0.25;
+
+/**
  * How long the controller waits for an outro before navigating anyway. GSAP's
  * ticker stops in a hidden tab, so a click from a background tab must not
- * strand the navigation behind a timeline that is not advancing.
+ * strand the navigation behind a timeline that is not advancing. Long enough
+ * for the curtain, which closes over the tail of the item exit.
  */
-export const OUTRO_TIMEOUT = 2000;
+export const OUTRO_TIMEOUT = 2500;
 
 /**
  * True when the OS asks for reduced motion. Read through one helper so every

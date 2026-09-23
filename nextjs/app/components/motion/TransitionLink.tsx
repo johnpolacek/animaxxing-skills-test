@@ -1,10 +1,17 @@
 "use client";
 
 import NextLink from "next/link";
-import type { ComponentProps } from "react";
-import { useRouteTransition } from "./RouteTransition";
+import { useRef, type ComponentProps } from "react";
+import { useRouteTransition, type Transition } from "./RouteTransition";
 
-type TransitionLinkProps = ComponentProps<typeof NextLink>;
+type TransitionLinkProps = ComponentProps<typeof NextLink> & {
+  /**
+   * `curtain` takes the full-screen curtain instead of the route-area swap.
+   * A link that holds a `[data-shared][data-flip-id]` element takes the
+   * shared-element morph without asking. Everything else is the plain swap.
+   */
+  transition?: "curtain";
+};
 
 /**
  * `next/link` with the outro in front of the navigation.
@@ -18,13 +25,16 @@ type TransitionLinkProps = ComponentProps<typeof NextLink>;
  * and keyboard behavior are unchanged: the navigation is cancelled, the page
  * plays its outro, and the boundary pushes once the end state is reached.
  */
-export function TransitionLink({ onNavigate, ...props }: TransitionLinkProps) {
+export function TransitionLink({ onNavigate, transition, ...props }: TransitionLinkProps) {
   const { requestNavigation } = useRouteTransition();
+  const anchor = useRef<HTMLAnchorElement>(null);
   const { href, replace, scroll, target } = props;
 
   return (
     <NextLink
       {...props}
+      ref={anchor}
+      data-transition={transition}
       onNavigate={(event) => {
         onNavigate?.(event);
         if (target || typeof href !== "string") return;
@@ -39,8 +49,20 @@ export function TransitionLink({ onNavigate, ...props }: TransitionLinkProps) {
           return;
         }
 
+        // The element that travels, if this link carries one. Read at click
+        // time from the link's own subtree, never from the document: under
+        // cacheComponents a hidden route can hold a copy with the same id.
+        const shared =
+          anchor.current?.querySelector<HTMLElement>("[data-shared][data-flip-id]") ?? null;
+        const how: Transition =
+          transition === "curtain"
+            ? { kind: "curtain" }
+            : shared
+              ? { kind: "shared", element: shared }
+              : { kind: "plain" };
+
         const to = `${destination.pathname}${destination.search}${destination.hash}`;
-        if (!requestNavigation(to, { replace, scroll })) return;
+        if (!requestNavigation(to, { replace, scroll, transition: how })) return;
         event.preventDefault();
       }}
     />

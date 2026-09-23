@@ -1,11 +1,18 @@
 <script setup lang="ts">
 import { mountChromeMotion } from "~/motion/chrome";
-import { pageTransition } from "~/motion/page-transition";
+import { mountCurtain, pageTransition } from "~/motion/page-transition";
 
-let cleanup: (() => void) | undefined;
-onMounted(() => { cleanup = mountChromeMotion(); });
-onBeforeUnmount(() => cleanup?.());
-
+const curtainRoot = useTemplateRef<HTMLElement>("curtain");
+const cleanups: Array<() => void> = [];
+onMounted(() => {
+  cleanups.push(mountChromeMotion());
+  // The curtain is the shell's: created once here, outside every page, so it
+  // survives the swap it hides. The transition module sweeps it.
+  if (curtainRoot.value) cleanups.push(mountCurtain(curtainRoot.value));
+});
+onBeforeUnmount(() => {
+  cleanups.splice(0).forEach((cleanup) => cleanup());
+});
 </script>
 
 <template>
@@ -25,6 +32,17 @@ onBeforeUnmount(() => cleanup?.());
     -->
     <div class="route">
       <NuxtPage :transition="pageTransition" />
+    </div>
+    <!--
+      Persistent shell: the curtain sits beside the route area, fixed over the
+      viewport, and passes over the chrome without touching it. At rest its
+      panels are hidden and it takes no pointer events; its phase is written by
+      the transition module, never bound from state, so hydration leaves it be.
+    -->
+    <div ref="curtain" class="curtain" data-curtain data-curtain-phase="idle" aria-hidden="true">
+      <div class="curtain-panel" data-curtain-panel></div>
+      <div class="curtain-panel" data-curtain-panel></div>
+      <div class="curtain-panel" data-curtain-panel></div>
     </div>
     <footer class="site-footer" data-chrome="footer" data-chrome-phase="initial" data-chrome-intro="">
       <span>Three routes, one lifecycle.</span>

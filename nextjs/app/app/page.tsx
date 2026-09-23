@@ -1,4 +1,5 @@
 import { PageMotion } from "@/components/motion/PageMotion";
+import { TransitionLink } from "@/components/motion/TransitionLink";
 
 export default function HomePage() {
   return (
@@ -13,7 +14,17 @@ export default function HomePage() {
           Every page is laid out with ordinary CSS before anything moves, so the content is legible
           the moment the document arrives.
         </p>
-        <p data-intro>Start with the work, or read a little about how the studio came together.</p>
+        <p data-intro>
+          Start with the{" "}
+          <TransitionLink href="/work" transition="curtain" data-testid="curtain-link">
+            work
+          </TransitionLink>
+          , browse the{" "}
+          <TransitionLink href="/gallery" data-testid="home-gallery">
+            gallery
+          </TransitionLink>
+          , or read a little about how the studio came together.
+        </p>
       </main>
     </PageMotion>
   );

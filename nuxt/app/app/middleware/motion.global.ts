@@ -1,4 +1,4 @@
-import { runPageOutro, takeHistoryNavigation } from "~/motion/page-transition";
+import { planHistoryArrival, runPageOutro, takeHistoryNavigation } from "~/motion/page-transition";
 
 /**
  * Holds a navigation open until the outgoing page has finished its outro.
@@ -18,8 +18,12 @@ export default defineNuxtRouteMiddleware(async (to, from) => {
   // Same screen, no page change, nothing to play.
   if (to.fullPath === from.fullPath) return;
   // Back and forward are intro-only, and must never be held: refusing or
-  // delaying a popstate leaves the URL and the view disagreeing.
-  if (takeHistoryNavigation(to.fullPath)) return;
+  // delaying a popstate leaves the URL and the view disagreeing. The hooks
+  // still need to know it is a return, so it is planned rather than played.
+  if (takeHistoryNavigation(to.fullPath)) {
+    planHistoryArrival();
+    return;
+  }
 
   await runPageOutro();
 });

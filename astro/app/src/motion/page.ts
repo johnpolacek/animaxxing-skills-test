@@ -16,7 +16,24 @@ const INTRO_SPREAD = 0.15;
 const OUTRO_DURATION = 0.3;
 const OUTRO_SPREAD = 0.05;
 
+/** Seconds before the fade ends that a composed shell timeline, such as a closing curtain, starts. */
+const EXTRA_OVERLAP = 0.15;
+
 const targetsIn = (root: HTMLElement) => gsap.utils.toArray<HTMLElement>("[data-intro]", root);
+
+export type LeaveOptions = {
+  /**
+   * A timeline the shell composes into the outro, such as a curtain closing.
+   * It starts just before the fade ends, and the end state waits for it. The
+   * shell owns it: `destroy()` hands it back before killing this context.
+   */
+  extra?: gsap.core.Timeline;
+  /**
+   * An element left lit through the outro, such as a shared element about to
+   * morph into the next page. Targets around it fade; it and its ancestors stay.
+   */
+  keep?: Element | null;
+};
 
 /**
  * The start values, written outside any controller.
@@ -45,13 +62,19 @@ export function createPageController(root: HTMLElement) {
   const ctx = gsap.context(() => {}, root);
   let active: gsap.core.Timeline | null = null;
   let cancelPending: (() => void) | null = null;
+  /** A shell-owned timeline nested in the outro; it must leave before the kill. */
+  let held: gsap.core.Timeline | null = null;
 
   const setPhase = (phase: Phase) => {
     if (root.getAttribute("data-phase") !== phase) root.setAttribute("data-phase", phase);
   };
 
-  /** Hand the targets back to plain CSS: no leftover inline styles at all. */
-  const settle = (els: HTMLElement[], focus: boolean) => {
+  /**
+   * Hand the targets back to plain CSS: no leftover inline styles at all.
+   * `onSettled` runs once, from the settled state, so the shell can release
+   * what it held for the intro, such as the scroller.
+   */
+  const settle = (els: HTMLElement[], focus: boolean, onSettled?: () => void) => {
     active = null;
     gsap.set(els, { clearProps: "all" });
     setPhase("settled");
@@ -61,6 +84,7 @@ export function createPageController(root: HTMLElement) {
     if (focus && document.activeElement === document.body) {
       root.focus({ preventScroll: true });
     }
+    onSettled?.();
   };
 
   const stop = () => {
@@ -76,7 +100,7 @@ export function createPageController(root: HTMLElement) {
    * Correct on a body that already holds settled values, because every start
    * value is written explicitly rather than inferred by a `from` tween.
    */
-  function enter(arrival: Arrival, focus = false) {
+  function enter(arrival: Arrival, focus = false, onSettled?: () => void) {
     ctx.add(() => {
       stop();
       const els = targetsIn(root);
@@ -92,7 +116,7 @@ export function createPageController(root: HTMLElement) {
           setPhase("intro");
           cancelPending = nextStep(() => {
             cancelPending = null;
-            settle(els, focus);
+            settle(els, focus, onSettled);
           });
         });
         return;
@@ -108,7 +132,7 @@ export function createPageController(root: HTMLElement) {
       cancelPending = nextStep(() => {
         cancelPending = null;
         setPhase("intro");
-        active = gsap.timeline({ onComplete: () => settle(els, focus) }).to(els, {
+        active = gsap.timeline({ onComplete: () => settle(els, focus, onSettled) }).to(els, {
           autoAlpha: 1,
           y: 0,
           duration: INTRO_DURATION,
@@ -125,12 +149,15 @@ export function createPageController(root: HTMLElement) {
    * on this promise, so the swap cannot show the next page early. An intro
    * still running is killed rather than reversed, because the outro is not its
    * inverse: it leaves from whatever is on screen.
+   *
+   * A composed `extra` timeline plays inside the outro, so the end state means
+   * it has completed too. A `keep` element, and anything holding it, stays lit.
    */
-  function leave(): Promise<void> {
+  function leave({ extra, keep }: LeaveOptions = {}): Promise<void> {
     return new Promise<void>((resolve) => {
       ctx.add(() => {
         stop();
-        const els = targetsIn(root);
+        const els = targetsIn(root).filter((el) => !keep || !(el.contains(keep) || keep.contains(el)));
         setPhase("outro");
 
         let ended = false;
@@ -143,6 +170,8 @@ export function createPageController(root: HTMLElement) {
         };
 
         if (prefersReducedMotion() || motionReleased()) {
+          // A composed timeline completes on its own instant path; the shell
+          // awaits it separately.
           gsap.set(els, { autoAlpha: 0 });
           cancelPending = nextStep(end);
           return;
@@ -160,7 +189,24 @@ export function createPageController(root: HTMLElement) {
             stagger: { amount: OUTRO_SPREAD },
             ease: "power2.in",
           });
+        if (extra) {
+          held = extra;
+          active.add(extra, `-=${EXTRA_OVERLAP}`);
+        }
       });
+    });
+  }
+
+  /**
+   * settled -> end, with no outro. A traverse swaps the body without leaving:
+   * the URL has already changed, so the outgoing page is done the moment the
+   * router accepts the move, and may not report itself as a settled page at
+   * the destination's address while the fetch is pending.
+   */
+  function finish() {
+    ctx.add(() => {
+      stop();
+      setPhase("end");
     });
   }
 
@@ -175,9 +221,13 @@ export function createPageController(root: HTMLElement) {
    * moment of their life.
    */
   function destroy() {
+    // A timeline the shell composed into the outro belongs to the shell. Hand it
+    // back before the kill so the curtain it drives is never this page's to end.
+    held?.parent?.remove(held);
+    held = null;
     stop();
     ctx.kill();
   }
 
-  return { root, enter, leave, destroy };
+  return { root, enter, leave, finish, destroy };
 }
