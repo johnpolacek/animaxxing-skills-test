@@ -286,3 +286,17 @@ test("a textRoll setup that throws restores the label and rethrows", async ({ op
   await page.evaluate(() => (window as any).HE.textRoll(document.getElementById("roll"))());
   expect(await page.$eval("#roll", (el) => el.innerHTML)).toBe(original);
 });
+
+test("underlineSweep draws from the inline start in right-to-left text", async ({ open }) => {
+  const page = await open("hover-effects");
+  await page.evaluate(() => {
+    document.body.insertAdjacentHTML("beforeend", '<p><a id="rtl-link" dir="rtl" href="#r" style="display:inline-block;font-size:24px">مرحبا بالعالم</a></p>');
+    (window as any).sweep = (window as any).HE.underlineSweep(document.getElementById("rtl-link"));
+  });
+  const box = (await page.locator("#rtl-link").boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.waitForTimeout(100);
+  const origin = await page.$eval("#rtl-link [data-underline]", (el) => (el as HTMLElement).style.transformOrigin);
+  expect(origin).toBe("100% 50%");
+  await page.evaluate(() => (window as any).sweep());
+});
