@@ -49,6 +49,9 @@ const RECIPES = [
   "blast-off",
   "particle-field",
   "particle-effects",
+  "smooth-scroll",
+  "page-covers",
+  "layout-flip",
 ];
 const files = [];
 for (const recipe of RECIPES) {
@@ -73,6 +76,9 @@ const ENTRIES = {
   "svg-counters": `import * as V from "./svg-effects"; import * as C from "./counters-and-marquees"; import gsap from "gsap"; Object.assign(window, { V, C, gsap });`,
   text: `import * as SE from "./split-entrances"; import * as RL from "./route-letters"; import * as SI from "./speak-in"; import * as W from "./wave"; import * as B from "./blast-off"; import gsap from "gsap"; Object.assign(window, { SE, RL, SI, W, B, gsap });`,
   particles: `import * as A from "./attach"; import * as FX from "./particle-effects"; import gsap from "gsap"; Object.assign(window, { A, FX, gsap });`,
+  "smooth-scroll": `import * as SC from "./scroll-controls"; import * as L from "./lenis-scroll"; import * as SM from "./smoother-scroll"; import gsap from "gsap"; import { ScrollTrigger } from "gsap/ScrollTrigger"; Object.assign(window, { SC, L, SM, gsap, ST: ScrollTrigger });`,
+  "page-covers": `import * as PC from "./page-covers"; import gsap from "gsap"; Object.assign(window, { PC, gsap });`,
+  "layout-flip": `import * as LF from "./layout-flip"; import gsap from "gsap"; import { Flip } from "gsap/Flip"; Object.assign(window, { LF, gsap, Flip });`,
 };
 for (const [name, code] of Object.entries(ENTRIES)) {
   const entry = path.join(src, `${name}.entry.ts`);
