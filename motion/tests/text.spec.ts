@@ -2,8 +2,8 @@ import { test, expect, style } from "./fixture";
 
 // Recipes: split-entrances.md, route-letters.md, speak-in.md, wave.md, blast-off.md
 
-const ENTRANCES = ["charsRiseIn", "charsSpringIn", "charsCascadeIn", "charsFlipIn", "charsScatterIn", "wordsSlideIn", "linesMaskIn", "scrambleIn"];
-const EXITS = ["charsFallOut", "charsCascadeOut", "charsFlipOut", "charsScatterOut", "wordsSlideOut", "linesMaskOut", "scrambleOut"];
+const ENTRANCES = ["charsRiseIn", "charsSpringIn", "charsCascadeIn", "charsFlipIn", "charsScatterIn", "wordsSlideIn", "linesMaskIn", "linesEllipseIn", "linesHighlightIn", "scrambleIn"];
+const EXITS = ["charsFallOut", "charsCascadeOut", "charsFlipOut", "charsScatterOut", "wordsSlideOut", "linesMaskOut", "linesEllipseOut", "linesHighlightOut", "scrambleOut"];
 
 for (const name of [...ENTRANCES, ...EXITS, "charsWeightWave"]) {
   test(`${name} completes and restores the heading's markup`, async ({ open }) => {
@@ -229,4 +229,93 @@ test("blast-off clears the hero, and its revert restores headline and container"
   expect(result).toEqual({ progress: 1, pressed: true });
   expect(await page.$eval("#hh", (el) => el.innerHTML)).toBe(heading);
   for (const id of ["#hero", "#hh", "#go", "#other"]) expect(await style(page, id), id).toBe("");
+});
+
+test("linesEllipseIn clips each line mask with an ellipse that opens as the line rises", async ({ open }) => {
+  const page = await open("text");
+  const original = await page.$eval("#hl", (el) => el.innerHTML);
+  const samples = await page.evaluate(async () => {
+    const { SE } = window as any;
+    const el = document.getElementById("hl")!;
+    let done!: () => void;
+    const finished = new Promise<void>((resolve) => (done = resolve));
+    const tl = SE.linesEllipseIn(el, { onComplete: () => done() });
+    tl.pause();
+    const read = () => {
+      const mask = el.firstElementChild as HTMLElement;
+      const line = mask.firstElementChild as HTMLElement;
+      return { clip: getComputedStyle(mask).clipPath, y: Number((window as any).gsap.getProperty(line, "yPercent")) };
+    };
+    tl.seek(0.01);
+    const start = read();
+    tl.seek(0.5);
+    const mid = read();
+    tl.timeScale(8).play();
+    await finished;
+    return { start, mid };
+  });
+  expect(samples.start.clip).toMatch(/^ellipse\(/);
+  expect(samples.start.y).toBeGreaterThan(30);
+  expect(samples.mid.y).toBeLessThan(samples.start.y);
+  expect(samples.mid.clip).not.toBe(samples.start.clip);
+  expect(await page.$eval("#hl", (el) => el.innerHTML)).toBe(original);
+});
+
+for (const id of ["hl", "hlr"]) {
+  test(`linesHighlightIn bars span each line's words in ${id === "hlr" ? "RTL" : "LTR"} and leave nothing behind`, async ({ open }) => {
+    const page = await open("text");
+    const original = await page.$eval(`#${id}`, (el) => el.innerHTML);
+    const result = await page.evaluate(async (target) => {
+      const { SE } = window as any;
+      const el = document.getElementById(target)!;
+      let done!: () => void;
+      const finished = new Promise<void>((resolve) => (done = resolve));
+      const tl = SE.linesHighlightIn(el, { onComplete: () => done() });
+      tl.pause();
+      // The first line's bar has fully covered its words.
+      tl.seek(0.34);
+      const bars = Array.from(el.querySelectorAll<HTMLElement>("[aria-hidden='true'][style*='line-highlight']"));
+      const firstLine = bars[0]!.parentElement!;
+      const words = Array.from(firstLine.children).filter((child) => child !== bars[0]);
+      const wordBox = words.map((word) => word.getBoundingClientRect());
+      // The bar's layout box, not its transformed box: it is still scaling here.
+      const lineBox = firstLine.getBoundingClientRect();
+      const bar = { left: lineBox.left + bars[0]!.offsetLeft, right: lineBox.left + bars[0]!.offsetLeft + bars[0]!.offsetWidth };
+      const hiddenWords = words.every((word) => getComputedStyle(word).visibility === "hidden");
+      const out = {
+        bars: bars.length,
+        barLeft: bar.left,
+        barRight: bar.right,
+        wordsLeft: Math.min(...wordBox.map((box) => box.left)),
+        wordsRight: Math.max(...wordBox.map((box) => box.right)),
+        lineWidth: firstLine.getBoundingClientRect().width,
+        hiddenWords,
+        color: getComputedStyle(bars[0]!).backgroundColor,
+      };
+      tl.timeScale(8).play();
+      await finished;
+      return out;
+    }, id);
+    expect(result.bars).toBe(2);
+    expect(result.hiddenWords).toBe(true);
+    expect(Math.abs(result.barLeft - result.wordsLeft)).toBeLessThan(1.5);
+    expect(Math.abs(result.barRight - result.wordsRight)).toBeLessThan(1.5);
+    expect(result.barRight - result.barLeft).toBeLessThan(result.lineWidth / 2);
+    if (id === "hl") expect(result.color).toBe("rgb(210, 255, 0)");
+    expect(await page.$eval(`#${id}`, (el) => el.innerHTML)).toBe(original);
+  });
+}
+
+test("a highlight run killed mid-sweep restores the text with no bars", async ({ open }) => {
+  const page = await open("text");
+  const original = await page.$eval("#hl", (el) => el.innerHTML);
+  await page.evaluate(() => {
+    const { SE } = window as any;
+    const el = document.getElementById("hl")!;
+    const tl = SE.linesHighlightIn(el);
+    tl.pause().seek(0.4);
+    tl.kill();
+    SE.revertText(el);
+  });
+  expect(await page.$eval("#hl", (el) => el.innerHTML)).toBe(original);
 });

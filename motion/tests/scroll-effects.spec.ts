@@ -242,3 +242,54 @@ test("scrollDirection flips past the threshold, marks the start, and restores", 
   await page.evaluate(() => (window as any).t());
   expect(await read()).toEqual([undefined, undefined]);
 });
+
+test("runDrift slides marked items through the run and restores them before the run reverts", async ({ open }) => {
+  const page = await open("scroll-effects");
+  const original = await declarations(page, "#dr");
+  await page.evaluate(() => {
+    const { S } = window as any;
+    const run = S.horizontalRun(document.getElementById("run"), document.getElementById("track"), { scrub: true });
+    (window as any).run = run;
+    (window as any).drift = S.runDrift(document.getElementById("track"), run);
+  });
+  // Computed matrix, so reading never writes inline styles.
+  const x = () => page.evaluate(() => new DOMMatrix(getComputedStyle(document.getElementById("dr")!).transform).m41);
+  const runStart = await page.evaluate(() => {
+    const trigger = (window as any).run.animation.scrollTrigger;
+    return { start: trigger.start, end: trigger.end };
+  });
+  await page.evaluate((y) => window.scrollTo(0, y), runStart.start);
+  await expect.poll(x).toBeLessThan(0);
+  const early = await x();
+  await page.evaluate((y) => window.scrollTo(0, y), runStart.end);
+  await expect.poll(x).toBeGreaterThan(early + 20);
+  expect(await x()).toBeLessThanOrEqual(48);
+  await page.evaluate(() => {
+    (window as any).drift();
+    (window as any).drift();
+  });
+  expect(await declarations(page, "#dr")).toEqual(original);
+  await page.evaluate(() => (window as any).run.revert());
+  expect(await style(page, "#track")).toBe("");
+});
+
+test("runDrift is a no-op without a run animation or under reduced motion", async ({ open }) => {
+  const page = await open("scroll-effects");
+  const counts = await page.evaluate(() => {
+    const { S, ST } = window as any;
+    const track = document.getElementById("track");
+    const idle = S.runDrift(track, { revert: () => {}, animation: undefined });
+    const without = ST.getAll().length;
+    const run = S.horizontalRun(document.getElementById("run"), track);
+    document.documentElement.dataset.motion = "reduced";
+    const before = ST.getAll().length;
+    const reduced = S.runDrift(track, run);
+    const after = ST.getAll().length;
+    idle();
+    reduced();
+    run.revert();
+    return [without, after - before];
+  });
+  expect(counts).toEqual([0, 0]);
+  expect(await style(page, "#dr")).toBe("display:block;width:50px;height:20px");
+});

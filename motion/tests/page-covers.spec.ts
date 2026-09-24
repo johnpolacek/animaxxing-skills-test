@@ -172,3 +172,110 @@ test("curtain tilt leans panels in and out; the title shows while covered and re
   expect(await declarations(page, "#ctitle")).toEqual(await declared(page, "position:absolute;inset:0;margin:0;color:#fff;visibility:hidden"));
   expect(await page.$$eval(".curtain-panel", (panels) => panels.map((panel) => panel.getAttribute("style") ?? ""))).toEqual(["", "", ""]);
 });
+
+test("curtain wipe opens a clip-path from the entry edge without moving the panels, then clears", async ({ open }) => {
+  const page = await open("page-covers");
+  const result = await page.evaluate(async () => {
+    const w = window as any;
+    document.getElementById("pre")!.style.display = "none";
+    const panel = document.querySelector<HTMLElement>(".curtain-panel")!;
+    const c = w.PC.curtain(".curtain-panel", { duration: 0.2, stagger: 0, wipe: true, tilt: 8 });
+    let moved = 0;
+    const watch = () => (moved = Math.max(moved, Math.abs(Number(w.gsap.getProperty(panel, "yPercent"))), Math.abs(Number(w.gsap.getProperty(panel, "rotation")))));
+    const run = (tl: any) => {
+      const clips: string[] = [];
+      tl.eventCallback("onUpdate", () => {
+        watch();
+        clips.push(getComputedStyle(panel).clipPath);
+      });
+      return new Promise<string[]>((resolve) => tl.eventCallback("onComplete", () => resolve(clips)));
+    };
+    const coverClips = await run(c.cover());
+    const covered = { clip: getComputedStyle(panel).clipPath, visibility: getComputedStyle(panel).visibility };
+    const hit = document.elementFromPoint(220, 210)?.className;
+    const revealClips = await run(c.reveal());
+    const revealed = getComputedStyle(panel).visibility;
+    c.revert();
+    return { coverClips, covered, hit, revealClips, revealed, moved };
+  });
+  expect(result.moved).toBe(0);
+  expect(result.coverClips.length).toBeGreaterThan(1);
+  expect(result.coverClips.every((clip) => clip.startsWith("polygon("))).toBe(true);
+  expect(result.covered).toEqual({ clip: "polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)", visibility: "visible" });
+  expect(result.hit).toBe("curtain-panel");
+  // Closing toward the top edge: the top points stay put while the bottom points rise. The last update is the reset.
+  expect(result.revealClips.at(-2)).toMatch(/^polygon\(0% 0%, 100% 0%, 100% [0-9.]+%, 0% [0-9.]+%\)$/);
+  expect(result.revealed).toBe("hidden");
+  expect(await page.$$eval(".curtain-panel", (panels) => panels.map((panel) => panel.getAttribute("style") ?? ""))).toEqual(["", "", ""]);
+});
+
+test("a wipe cover requested mid-reveal turns back from the current clip", async ({ open }) => {
+  const page = await open("page-covers");
+  const result = await page.evaluate(async () => {
+    const { PC } = window as any;
+    document.getElementById("pre")!.style.display = "none";
+    const panel = document.querySelector<HTMLElement>(".curtain-panel")!;
+    const c = PC.curtain(".curtain-panel", { duration: 0.4, stagger: 0, wipe: true });
+    c.cover().progress(1);
+    c.reveal();
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    const leaving = getComputedStyle(panel).clipPath;
+    c.cover();
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    const turning = getComputedStyle(panel).clipPath;
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    return { leaving, turning, end: getComputedStyle(panel).clipPath, visibility: getComputedStyle(panel).visibility };
+  });
+  // Partly closed toward the top, never snapped back to the bottom edge.
+  expect(result.leaving).not.toBe("polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)");
+  expect(result.turning).toMatch(/^polygon\(0% 0%, 100% 0%/);
+  expect(result.end).toBe("polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)");
+  expect(result.visibility).toBe("visible");
+});
+
+test("curtain drift carries the content away on cover, trails it in on reveal, and leaves no transform", async ({ open }) => {
+  const page = await open("page-covers");
+  const result = await page.evaluate(async () => {
+    const w = window as any;
+    document.getElementById("pre")!.style.display = "none";
+    const content = document.querySelector("main")!;
+    const c = w.PC.curtain(".curtain-panel", { duration: 0.2, stagger: 0, drift: { content, distance: 0.2 } });
+    // Read the computed matrix: gsap.getProperty would write inline transform longhands.
+    const y = () => new DOMMatrix(getComputedStyle(content).transform).m42;
+    await new Promise((resolve) => c.cover().eventCallback("onComplete", resolve));
+    const covered = y();
+    let most = 0;
+    const reveal = c.reveal();
+    reveal.eventCallback("onUpdate", () => (most = Math.max(most, y())));
+    await new Promise((resolve) => reveal.eventCallback("onComplete", resolve));
+    const after = content.getAttribute("style") ?? "";
+    // Revert mid-cover also restores the wrapper.
+    c.cover();
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    const moving = y();
+    c.revert();
+    return { covered, most, after, moving, reverted: content.getAttribute("style") ?? "", height: innerHeight };
+  });
+  expect(result.covered).toBeCloseTo(-0.2 * result.height, 0);
+  expect(result.most).toBeGreaterThan(0.1 * result.height);
+  expect(result.after).toBe("");
+  expect(result.moving).toBeLessThan(0);
+  expect(result.reverted).toBe("");
+});
+
+test("curtain drift under reduced motion never moves the content", async ({ open }) => {
+  const page = await open("page-covers");
+  const result = await page.evaluate(async () => {
+    const w = window as any;
+    document.documentElement.dataset.motion = "reduced";
+    const content = document.querySelector("main")!;
+    const c = w.PC.curtain(".curtain-panel", { wipe: true, drift: { content } });
+    let fired = 0;
+    c.cover().eventCallback("onComplete", () => fired++);
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    c.reveal().eventCallback("onComplete", () => fired++);
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    return { fired, y: new DOMMatrix(getComputedStyle(content).transform).m42, style: content.getAttribute("style") ?? "" };
+  });
+  expect(result).toEqual({ fired: 2, y: 0, style: "" });
+});

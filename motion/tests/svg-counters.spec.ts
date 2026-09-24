@@ -275,3 +275,42 @@ test("logoCycle under reduced motion leaves the grid as it is", async ({ open })
   await page.waitForTimeout(500);
   expect(await page.$$eval("[data-logo-cell]", (cells) => cells.map((cell) => cell.textContent))).toEqual(["L0", "L1"]);
 });
+
+test("morphScrub follows scroll both ways and restores the authored d", async ({ open }) => {
+  const page = await open("svg-counters");
+  const original = await page.$eval("#curve", (el) => el.getAttribute("d"));
+  const height = () => page.$eval("#curve", (el) => (el as SVGPathElement).getBBox().height);
+  const startHeight = await height();
+  await page.evaluate(() => {
+    (window as any).ms = (window as any).V.morphScrub(document.getElementById("curve"), "M0 10 C30 10 70 10 100 10 Z");
+  });
+  // The edge's top at the viewport's top: the end of the scrub, flat.
+  await page.evaluate(() => window.scrollTo(0, document.getElementById("edge")!.getBoundingClientRect().top + scrollY));
+  await expect.poll(height).toBeLessThan(0.5);
+  // Halfway through its pass the curve is partly flattened.
+  await page.evaluate(() => window.scrollTo(0, document.getElementById("edge")!.getBoundingClientRect().top + scrollY - innerHeight / 2));
+  await expect.poll(height).toBeGreaterThan(1);
+  expect(await height()).toBeLessThan(startHeight - 1);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect.poll(height).toBeCloseTo(startHeight, 1);
+  await page.evaluate(() => {
+    window.scrollTo(0, document.getElementById("edge")!.getBoundingClientRect().top + scrollY);
+    (window as any).ms();
+    (window as any).ms();
+  });
+  expect(await page.$eval("#curve", (el) => el.getAttribute("d"))).toBe(original);
+  expect(await style(page, "#curve")).toBe("");
+});
+
+test("morphScrub under reduced motion keeps the authored shape", async ({ open }) => {
+  const page = await open("svg-counters");
+  const original = await page.$eval("#curve", (el) => el.getAttribute("d"));
+  await page.evaluate(() => {
+    document.documentElement.dataset.motion = "reduced";
+    (window as any).ms = (window as any).V.morphScrub(document.getElementById("curve"), "M0 10 C30 10 70 10 100 10 Z");
+    window.scrollTo(0, document.getElementById("edge")!.getBoundingClientRect().top + scrollY);
+  });
+  await page.waitForTimeout(200);
+  expect(await page.$eval("#curve", (el) => el.getAttribute("d"))).toBe(original);
+  await page.evaluate(() => (window as any).ms());
+});
