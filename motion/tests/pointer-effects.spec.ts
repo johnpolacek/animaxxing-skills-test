@@ -304,3 +304,96 @@ test("cursor label scrolls the hovered text in place of the dot, hides on leave,
     await declared(page, "position:fixed;left:0;top:0;width:9em;overflow:hidden;white-space:nowrap;visibility:hidden;pointer-events:none"),
   );
 });
+
+// Proximity row: #p1..#p4 hit areas centered at x 420, 480, 540, 600 and y 640; #pt1..#pt4 scale inside them.
+const PT = "display: block; width: 40px; height: 40px; background: rgb(153, 153, 255); transform-origin: 50% 100%;";
+
+test("proximity swells items by distance, lifts them, settles away, and restores", async ({ open }) => {
+  const page = await open("pointer-effects");
+  await page.evaluate(() => ((window as any).t = (window as any).P.proximity(document.getElementById("prox"), { radius: 100, lift: 10 })));
+  await page.mouse.move(300, 640);
+  await page.mouse.move(420, 640, { steps: 4 });
+  await expect.poll(() => prop(page, "#pt1", "scale")).toBeGreaterThan(1.55);
+  const near = await prop(page, "#pt2", "scale");
+  // 60px away: part of the peak. 180px away: outside the radius.
+  expect(near).toBeGreaterThan(1.05);
+  expect(near).toBeLessThan(1.5);
+  expect(await prop(page, "#pt4", "scale")).toBe(1);
+  await expect.poll(() => prop(page, "#pt1", "y")).toBeLessThan(-9);
+  // Hit areas stay put.
+  expect(await style(page, "#p1")).toBe("display:block;width:40px;height:40px");
+
+  await page.mouse.move(420, 300, { steps: 4 });
+  await expect.poll(() => prop(page, "#pt1", "scale")).toBeCloseTo(1, 2);
+  await expect.poll(() => prop(page, "#pt1", "y")).toBeCloseTo(0, 1);
+  await page.evaluate(() => {
+    (window as any).t();
+    (window as any).t();
+  });
+  expect(await style(page, "#pt1")).toBe(PT);
+  expect(await style(page, "#pt2")).toBe(PT);
+});
+
+test("proximity along one axis ignores the other, and scales an item without a target child", async ({ open }) => {
+  const page = await open("pointer-effects");
+  await page.evaluate(() => {
+    const w = window as any;
+    w.row = w.P.proximity(document.getElementById("prox"), { radius: 100, axis: "x" });
+    w.self = w.P.proximity(document.getElementById("proxself"), { radius: 100 });
+  });
+  // 60px below the row's centers: full size along x only.
+  await page.mouse.move(420, 690, { steps: 4 });
+  await expect.poll(() => prop(page, "#pt1", "scale")).toBeGreaterThan(1.55);
+  await page.mouse.move(720, 640, { steps: 4 });
+  await expect.poll(() => prop(page, "#ps1", "scale")).toBeGreaterThan(1.55);
+  await page.evaluate(() => {
+    (window as any).row();
+    (window as any).self();
+  });
+  expect(await style(page, "#ps1")).toBe("display: block; width: 40px; height: 40px; background: rgb(255, 204, 153); opacity: 0.9;");
+  expect(await style(page, "#pt1")).toBe(PT);
+});
+
+test("proximity rests when the mouse leaves the window, and ignores touch and reduced motion", async ({ open }) => {
+  const page = await open("pointer-effects");
+  await page.evaluate(() => ((window as any).t = (window as any).P.proximity(document.getElementById("prox"), { radius: 100 })));
+  await page.mouse.move(300, 640);
+  await page.mouse.move(420, 640, { steps: 4 });
+  await expect.poll(() => prop(page, "#pt1", "scale")).toBeGreaterThan(1.55);
+  await page.evaluate(() => document.body.dispatchEvent(new PointerEvent("pointerout", { pointerType: "mouse", bubbles: true })));
+  await expect.poll(() => prop(page, "#pt1", "scale")).toBeCloseTo(1, 2);
+
+  await page.evaluate(() => {
+    const w = window as any;
+    w.t();
+    w.t = w.P.proximity(document.getElementById("prox"), { radius: 100 });
+    document.dispatchEvent(new PointerEvent("pointermove", { pointerType: "touch", clientX: 480, clientY: 640 }));
+  });
+  await page.waitForTimeout(400);
+  expect(await style(page, "#pt2")).toBe(PT);
+
+  await page.evaluate(() => {
+    const w = window as any;
+    w.t();
+    document.documentElement.dataset.motion = "reduced";
+    w.t = w.P.proximity(document.getElementById("prox"), { radius: 100 });
+  });
+  await page.mouse.move(540, 640, { steps: 4 });
+  await page.waitForTimeout(400);
+  expect(await style(page, "#pt3")).toBe(PT);
+});
+
+test("a proximity setup that throws rolls back and rethrows", async ({ open }) => {
+  const page = await open("pointer-effects");
+  const result = await page.evaluate(() => {
+    const w = window as any;
+    try {
+      w.P.proximity(document.getElementById("prox"), { items: "a[[" });
+      return "no throw";
+    } catch (error) {
+      return `${(error as Error).name}|${!!w.gsap.context()}`;
+    }
+  });
+  expect(result).toBe("SyntaxError|false");
+  expect(await declarations(page, "#pt1")).toEqual(await declared(page, PT));
+});
