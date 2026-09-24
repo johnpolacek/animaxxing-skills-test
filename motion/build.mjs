@@ -1,4 +1,4 @@
-// Extracts each recipe's TypeScript from the installed animaxxing skill,
+// Extracts each recipe's TypeScript from the animaxxing and animaxxing-webgl skills,
 // type-checks it, and bundles it for the fixtures. Point SKILLS_REPO at
 // another checkout to test unreleased recipes.
 import { execFileSync } from "node:child_process";
@@ -9,7 +9,7 @@ import { build } from "esbuild";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const skillsRepo = path.resolve(process.env.SKILLS_REPO ?? path.join(here, "../../animaxxing-skills"));
-const recipes = path.join(skillsRepo, "skills/animaxxing/references/recipes");
+const recipeDir = (skill) => path.join(skillsRepo, `skills/${skill}/references/recipes`);
 const out = path.join(here, ".build");
 const src = path.join(out, "src");
 mkdirSync(src, { recursive: true });
@@ -20,7 +20,7 @@ mkdirSync(src, { recursive: true });
  * module. Usage blocks (under "## Wiring" or starting "// Example") are skipped.
  */
 function extract(recipe) {
-  const markdown = readFileSync(path.join(recipes, `${recipe}.md`), "utf8");
+  const markdown = readFileSync(path.join(recipeDir(SKILL_OF[recipe] ?? "animaxxing"), `${recipe}.md`), "utf8");
   const modules = new Map();
   let file = recipe;
   let skip = false;
@@ -57,7 +57,12 @@ const RECIPES = [
   "hover-effects",
   "section-pager",
   "sound-cues",
+  "webgl-stage",
+  "image-planes",
+  "uniform-effects",
 ];
+/** Recipes outside the core animaxxing skill. */
+const SKILL_OF = { "webgl-stage": "animaxxing-webgl", "image-planes": "animaxxing-webgl", "uniform-effects": "animaxxing-webgl" };
 /** MOTION_ONLY=recipe[,recipe] builds and type-checks just those, so parallel work on one recipe cannot break another's run. */
 const only = process.env.MOTION_ONLY?.split(",").map((name) => name.trim()).filter(Boolean);
 const selected = only ? RECIPES.filter((recipe) => only.includes(recipe)) : RECIPES;
@@ -92,6 +97,7 @@ const ENTRIES = {
   "hover-effects": `import * as HE from "./hover-effects"; import gsap from "gsap"; Object.assign(window, { HE, gsap });`,
   "section-pager": `import * as SP from "./section-pager"; import gsap from "gsap"; import { Observer } from "gsap/Observer"; Object.assign(window, { SP, gsap, Observer });`,
   "sound-cues": `import * as SO from "./sound-cues"; import gsap from "gsap"; Object.assign(window, { SO, gsap });`,
+  webgl: `import * as WS from "./webgl-stage"; import * as IP from "./image-planes"; import * as UE from "./uniform-effects"; import gsap from "gsap"; import { ScrollTrigger } from "gsap/ScrollTrigger"; Object.assign(window, { WS, IP, UE, gsap, ST: ScrollTrigger });`,
 };
 /** Entries whose recipes were built; the original five bundle several recipes each. */
 const ENTRY_RECIPES = {
@@ -100,6 +106,7 @@ const ENTRY_RECIPES = {
   "smooth-scroll": ["smooth-scroll"], "page-covers": ["page-covers"], "layout-flip": ["layout-flip"],
   "media-effects": ["media-effects"], "component-motion": ["component-motion"], "hover-effects": ["hover-effects"],
   "section-pager": ["section-pager"], "sound-cues": ["sound-cues"],
+  webgl: ["webgl-stage", "image-planes", "uniform-effects"],
 };
 for (const [name, code] of Object.entries(ENTRIES)) {
   if (!ENTRY_RECIPES[name].every((recipe) => selected.includes(recipe))) continue;
