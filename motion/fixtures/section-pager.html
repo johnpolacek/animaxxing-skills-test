@@ -1,0 +1,17 @@
+<!doctype html><html><head><style>
+body{margin:0;font:16px sans-serif}
+header{position:fixed;top:0;left:0;z-index:10}
+[data-pager]{position:relative;height:100vh;height:100svh;overflow:clip;touch-action:pinch-zoom}
+[data-pager]>*{position:absolute;inset:0}
+section{height:700px;box-sizing:border-box;padding:60px}
+#s0{background:#fdd}#s1{background:#dfd}#s2{background:#ddf}#s3{background:#ffd}
+#inner{height:120px;overflow:auto}#inner div{height:600px}
+</style></head><body>
+<header><a href="#s2" id="skip">Skip</a></header>
+<main id="pager">
+<section id="s0" style="color:rgb(1, 2, 3)"><h2>Zero</h2><button id="b0">Button</button></section>
+<section id="s1"><h2>One</h2><input id="field"><div id="inner" data-pager-ignore><div>Tall</div></div></section>
+<section id="s2"><h2>Two</h2><a href="#x" id="link2">Link in two</a></section>
+<section id="s3"><h2>Three</h2><div role="tablist" id="tabs"><button role="tab" id="tab">Tab</button></div></section>
+</main>
+<script src="../.build/section-pager.js"></script></body></html>

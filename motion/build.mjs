@@ -55,6 +55,8 @@ const RECIPES = [
   "media-effects",
   "component-motion",
   "hover-effects",
+  "section-pager",
+  "sound-cues",
 ];
 /** MOTION_ONLY=recipe[,recipe] builds and type-checks just those, so parallel work on one recipe cannot break another's run. */
 const only = process.env.MOTION_ONLY?.split(",").map((name) => name.trim()).filter(Boolean);
@@ -88,6 +90,8 @@ const ENTRIES = {
   "media-effects": `import * as ME from "./media-effects"; import gsap from "gsap"; import { ScrollTrigger } from "gsap/ScrollTrigger"; Object.assign(window, { ME, gsap, ST: ScrollTrigger });`,
   "component-motion": `import * as CM from "./component-motion"; import gsap from "gsap"; Object.assign(window, { CM, gsap });`,
   "hover-effects": `import * as HE from "./hover-effects"; import gsap from "gsap"; Object.assign(window, { HE, gsap });`,
+  "section-pager": `import * as SP from "./section-pager"; import gsap from "gsap"; import { Observer } from "gsap/Observer"; Object.assign(window, { SP, gsap, Observer });`,
+  "sound-cues": `import * as SO from "./sound-cues"; import gsap from "gsap"; Object.assign(window, { SO, gsap });`,
 };
 /** Entries whose recipes were built; the original five bundle several recipes each. */
 const ENTRY_RECIPES = {
@@ -95,6 +99,7 @@ const ENTRY_RECIPES = {
   text: ["split-entrances", "route-letters", "speak-in", "wave", "blast-off"], particles: ["particle-field", "particle-effects"],
   "smooth-scroll": ["smooth-scroll"], "page-covers": ["page-covers"], "layout-flip": ["layout-flip"],
   "media-effects": ["media-effects"], "component-motion": ["component-motion"], "hover-effects": ["hover-effects"],
+  "section-pager": ["section-pager"], "sound-cues": ["sound-cues"],
 };
 for (const [name, code] of Object.entries(ENTRIES)) {
   if (!ENTRY_RECIPES[name].every((recipe) => selected.includes(recipe))) continue;
