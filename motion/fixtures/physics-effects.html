@@ -1,0 +1,10 @@
+<!doctype html><html><head><style>
+body{margin:0;font:16px sans-serif}
+.physics-layer{position:fixed;inset:0;z-index:60;overflow:hidden;pointer-events:none}
+.physics-layer>*{position:absolute;left:0;top:0}
+#btn{position:absolute;left:400px;top:500px;width:120px;height:40px}
+</style></head><body>
+<button id="btn">Party</button>
+<span id="star" class="star">★<b id="inner">!</b></span>
+<div class="physics-layer" id="layer" aria-hidden="true"></div>
+<script src="../.build/physics-effects.js"></script></body></html>

@@ -171,3 +171,64 @@ test("reduced motion: a drag without the throw still lands on the nearest item",
   await page.evaluate(() => (window as any).dt.revert());
   expect(await style(page, "#tr")).toBe("");
 });
+
+test("momentum hover knocks targets along a fast sweep, spins them, settles, and restores", async ({ open }) => {
+  const page = await open("pointer-effects");
+  await page.evaluate(() => {
+    const w = window as any;
+    w.t = w.P.momentumHover(document.getElementById("mom"));
+    w.peak = 0;
+    w.spin = 0;
+    w.sampling = true;
+    // getProperty parses the transform, which writes inline; stop sampling before teardown.
+    const sample = () => {
+      if (!w.sampling) return;
+      w.peak = Math.max(w.peak, Math.abs(Number(w.gsap.getProperty("#mt1", "x"))));
+      w.spin = Math.max(w.spin, Math.abs(Number(w.gsap.getProperty("#mt1", "rotation"))));
+      requestAnimationFrame(sample);
+    };
+    sample();
+  });
+  await page.mouse.move(60, 610);
+  await page.mouse.move(80, 610);
+  await page.mouse.move(300, 610, { steps: 4 });
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => (window as any).peak)).toBeGreaterThan(1);
+  expect(await page.evaluate(() => (window as any).spin)).toBeGreaterThan(0.5);
+  // The hit area stays put; only its target moves.
+  expect(await style(page, "#m1")).toBe("width:60px;height:60px");
+  await expect.poll(() => prop(page, "#mt1", "x"), { timeout: 4000 }).toBeCloseTo(0, 0);
+  await page.evaluate(() => {
+    (window as any).sampling = false;
+    (window as any).t();
+    (window as any).t();
+  });
+  expect(await style(page, "#mt1")).toBe("display: block; width: 60px; height: 60px; background: rgb(255, 153, 153);");
+});
+
+test("momentum hover ignores a still pointer, touch, and reduced motion", async ({ open }) => {
+  const page = await open("pointer-effects");
+  await page.evaluate(() => ((window as any).t = (window as any).P.momentumHover(document.getElementById("mom"))));
+  await page.mouse.move(90, 630);
+  await page.mouse.move(95, 630);
+  await page.waitForTimeout(300);
+  await page.mouse.move(130, 630);
+  await page.waitForTimeout(100);
+  expect(Math.abs(await prop(page, "#mt1", "x"))).toBeLessThan(0.5);
+  await page.evaluate(() => {
+    const hit = document.getElementById("m2")!;
+    hit.dispatchEvent(new PointerEvent("pointermove", { pointerType: "touch", clientX: 200, clientY: 630, bubbles: true }));
+    hit.dispatchEvent(new PointerEvent("pointerenter", { pointerType: "touch", clientX: 230, clientY: 630 }));
+  });
+  await page.waitForTimeout(100);
+  expect(Math.abs(await prop(page, "#mt2", "x"))).toBeLessThan(0.5);
+  await page.evaluate(() => {
+    (window as any).t();
+    document.documentElement.dataset.motion = "reduced";
+    (window as any).t = (window as any).P.momentumHover(document.getElementById("mom"));
+  });
+  await page.mouse.move(60, 610);
+  await page.mouse.move(300, 610, { steps: 4 });
+  await page.waitForTimeout(200);
+  expect(await style(page, "#mt1")).toBe("display: block; width: 60px; height: 60px; background: rgb(255, 153, 153);");
+});

@@ -1,0 +1,13 @@
+<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>
+body{margin:0;font:16px sans-serif}
+.flick{width:600px;margin:60px 200px}
+.flick-stack{display:flex;gap:16px;overflow-x:auto;list-style:none;margin:0;padding:0}
+.flick-stack li{flex:none;width:300px;height:200px;background:#ccc}
+.flick-stack a{display:block;width:100px;height:60px;background:#999}
+[data-flick] .flick-stack{display:grid;overflow:visible;justify-content:center}
+[data-flick] .flick-stack>*{grid-area:1/1}
+</style></head><body>
+<section class="flick" id="root" aria-roledescription="carousel" aria-label="Deck" tabindex="0">
+<ul class="flick-stack" id="stack"><li id="c0" style="color: rgb(1, 2, 3);"><a href="#l0" id="l0">0</a></li><li id="c1"><a href="#l1" id="l1">1</a></li><li id="c2">2</li><li id="c3">3</li><li id="c4">4</li><li id="c5">5</li><li id="c6">6</li></ul>
+</section>
+<script src="../.build/endless-drag.js"></script></body></html>
