@@ -1,7 +1,7 @@
 import { test, expect, style } from "./fixture";
 
 // Recipes: animaxxing-webgl/references/recipes/{webgl-stage,image-planes,uniform-effects}.md
-// Headless Chromium draws through SwiftShader. Checks cover lifecycle, fallbacks, and uniforms, never pixels.
+// Headless Chromium draws through SwiftShader. Checks cover lifecycle, fallbacks, uniforms, and sampled pixels.
 test.use({ launchOptions: { args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"] } });
 
 type Page = import("@playwright/test").Page;
@@ -21,9 +21,15 @@ const prepare = async (page: Page) => {
   await page.addInitScript(() => {
     const counts: Record<string, number> = {};
     (window as any).glCounts = counts;
+    (window as any).shaderSources = [] as string[];
     const names = ["createTexture", "deleteTexture", "createBuffer", "deleteBuffer", "createProgram", "deleteProgram",
       "createShader", "deleteShader", "createVertexArray", "deleteVertexArray", "clear"];
     for (const proto of [WebGLRenderingContext.prototype, WebGL2RenderingContext.prototype] as any[]) {
+      const shaderSource = proto.shaderSource;
+      proto.shaderSource = function (shader: WebGLShader, source: string) {
+        (window as any).shaderSources.push(source);
+        return shaderSource.call(this, shader, source);
+      };
       for (const name of names) {
         const original = proto[name];
         if (!original) continue;
@@ -369,4 +375,66 @@ test("a frame that throws hides the canvas, shows the images, and refuses new pl
   expect(await page.$eval("canvas[data-webgl-stage]", (c) => (c as HTMLElement).style.display)).toBe("none");
   expect(await planes(page, ["hover"])).toEqual([false]);
   expect(await opacity(page, "hover")).toBe("");
+});
+
+/** Sample after GSAP draws, before the browser discards the default framebuffer. */
+const pixelAt = (page: Page, x: number, y: number) => page.evaluate(([x, y]) => new Promise<number[]>((resolve) => {
+  const w = window as any;
+  const sample = () => {
+    const canvas = document.querySelector<HTMLCanvasElement>("canvas[data-webgl-stage]")!;
+    const gl = (canvas.getContext("webgl2") ?? canvas.getContext("webgl"))!;
+    const pixel = new Uint8Array(4);
+    gl.readPixels(Math.floor(x * canvas.width / innerWidth), Math.floor((innerHeight - y) * canvas.height / innerHeight), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+    w.gsap.ticker.remove(sample);
+    resolve([...pixel]);
+  };
+  w.gsap.ticker.add(sample);
+}), [x, y]);
+
+for (const initiallyHidden of [false, true]) {
+  test(`planes respect wrapper visibility without blocking readiness (initiallyHidden=${initiallyHidden})`, async ({ open, page }) => {
+    await openWebgl(open, page);
+    await page.evaluate((hidden) => {
+      const image = document.getElementById("a")!;
+      const wrapper = document.createElement("div");
+      wrapper.id = "image-wrapper";
+      image.before(wrapper);
+      wrapper.append(image);
+      wrapper.style.visibility = hidden ? "hidden" : "visible";
+    }, initiallyHidden);
+    expect(await planes(page, ["a"])).toEqual([true]);
+    for (const visible of [!initiallyHidden, initiallyHidden, !initiallyHidden]) {
+      await page.$eval("#image-wrapper", (el, visible) => { (el as HTMLElement).style.visibility = visible ? "visible" : "hidden"; }, visible);
+      await expect.poll(() => pixelAt(page, 100, 100)).toEqual(visible ? [204, 51, 51, 255] : [0, 0, 0, 0]);
+    }
+    await page.evaluate(() => { (window as any).planes.a.revert(); (window as any).planes.a.revert(); });
+    expect(await style(page, "#a")).toBe("");
+    expect(await canvases(page)).toBe(0);
+  });
+}
+
+test("default shaders use defined smoothstep edges and the lens changes rendered pixels", async ({ open, page }) => {
+  await openWebgl(open, page);
+  await page.evaluate(() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 256; canvas.height = 256;
+    const ctx = canvas.getContext("2d")!;
+    const gradient = ctx.createLinearGradient(0, 0, 256, 0);
+    gradient.addColorStop(0, "black"); gradient.addColorStop(1, "white");
+    ctx.fillStyle = gradient; ctx.fillRect(0, 0, 256, 256);
+    (document.getElementById("a") as HTMLImageElement).src = canvas.toDataURL();
+  });
+  await planes(page, ["a"]);
+  // GLSL defines smoothstep only for increasing edges. Check the submitted shader,
+  // since a permissive software driver can make reversed edges look correct.
+  const constantEdges = await page.evaluate(() => (window as any).shaderSources.flatMap((source: string) =>
+    [...source.matchAll(/smoothstep\(\s*([\d.]+)\s*,\s*([\d.]+)/g)].map(match => [Number(match[1]), Number(match[2])])) as number[][]);
+  expect(constantEdges.length).toBeGreaterThan(0);
+  for (const [low, high] of constantEdges) expect(low).toBeLessThan(high);
+  const before = await pixelAt(page, 300, 165);
+  await page.evaluate(() => { (window as any).planes.a.uniforms.uHover.value = 1; });
+  await expect.poll(async () => Math.abs((await pixelAt(page, 300, 165))[0]! - before[0]!)).toBeGreaterThan(3);
+  await page.evaluate(() => { (window as any).planes.a.uniforms.uHover.value = 0; });
+  await expect.poll(() => pixelAt(page, 300, 165)).toEqual(before);
+  await page.evaluate(() => (window as any).planes.a.revert());
 });

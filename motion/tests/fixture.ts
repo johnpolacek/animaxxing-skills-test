@@ -25,7 +25,7 @@ export const declarations = (page: Page, selector: string) =>
   page.$eval(selector, (el) => {
     const probe = document.createElement("div");
     probe.setAttribute("style", el.getAttribute("style") ?? "");
-    return Array.from(probe.style).map((name) => `${name}: ${probe.style.getPropertyValue(name)}`).sort();
+    return Array.from(probe.style).map((name) => `${name}: ${probe.style.getPropertyValue(name)}${probe.style.getPropertyPriority(name) ? " !important" : ""}`).sort();
   });
 
 /** The same list for a literal style string. */
@@ -33,7 +33,7 @@ export const declared = (page: Page, css: string) =>
   page.evaluate((text) => {
     const probe = document.createElement("div");
     probe.setAttribute("style", text);
-    return Array.from(probe.style).map((name) => `${name}: ${probe.style.getPropertyValue(name)}`).sort();
+    return Array.from(probe.style).map((name) => `${name}: ${probe.style.getPropertyValue(name)}${probe.style.getPropertyPriority(name) ? " !important" : ""}`).sort();
   }, css);
 
 export const prop = (page: Page, selector: string, name: string) =>

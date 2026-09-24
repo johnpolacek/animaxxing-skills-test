@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { test, expect, style, declarations, declared } from "./fixture";
 
 // Recipe: animaxxing/references/recipes/scroll-effects.md
@@ -293,3 +295,47 @@ test("runDrift is a no-op without a run animation or under reduced motion", asyn
   expect(counts).toEqual([0, 0]);
   expect(await style(page, "#dr")).toBe("display:block;width:50px;height:20px");
 });
+
+test("track restores authored CSS priorities", async ({ open }) => {
+  const page = await open("scroll-effects");
+  const result = await page.evaluate(() => {
+    const w = window as any;
+    const el = document.getElementById("track")!;
+    el.style.setProperty("transform", "translateX(3px)", "important");
+    const before = [el.style.getPropertyValue("transform"), el.style.getPropertyPriority("transform")];
+    const effect = w.S.horizontalRun(document.getElementById("run"), el);
+    effect.revert(); effect.revert();
+    return { before, after: [el.style.getPropertyValue("transform"), el.style.getPropertyPriority("transform")] };
+  });
+  expect(result.after).toEqual(result.before);
+});
+
+for (const reduced of [false, true]) {
+  test(`the documented scroll header stays visible on keyboard focus (reduced=${reduced})`, async ({ open }) => {
+    const skillsRepo = process.env.SKILLS_REPO ?? path.resolve(__dirname, "../../../animaxxing-skills");
+    const recipe = readFileSync(path.join(skillsRepo, "skills/animaxxing/references/recipes/scroll-effects.md"), "utf8");
+    const css = recipe.split("## scrollDirection")[1]!.match(/```css\n([\s\S]*?)```/)![1]!;
+    const page = await open("scroll-effects");
+    await page.emulateMedia({ reducedMotion: reduced ? "reduce" : "no-preference" });
+    await page.addStyleTag({ content: css });
+    await page.evaluate(() => {
+      const header = document.getElementById("hdr")!;
+      header.className = "site-header";
+      header.innerHTML = '<a id="header-link" href="#top">Home</a>';
+      const before = document.createElement("button");
+      before.id = "before-header";
+      before.style.cssText = "position:fixed;bottom:0";
+      before.textContent = "Before";
+      header.before(before);
+      (window as any).direction = (window as any).S.scrollDirection();
+      window.scrollTo(0, 200);
+    });
+    await expect.poll(() => page.$eval("#hdr", el => el.getBoundingClientRect().bottom)).toBeLessThanOrEqual(0);
+    await page.focus("#before-header");
+    await page.keyboard.press("Tab");
+    await expect(page.locator("#header-link")).toBeFocused();
+    await expect.poll(() => page.$eval("#hdr", el => el.getBoundingClientRect().top)).toBeGreaterThanOrEqual(0);
+    await page.evaluate(() => { (window as any).direction(); (window as any).direction(); });
+    expect(await page.getAttribute("html", "data-scroll-direction")).toBeNull();
+  });
+}

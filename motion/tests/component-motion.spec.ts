@@ -728,3 +728,17 @@ test("an enterExit whose entrance throws rolls back and rethrows", async ({ open
   });
   expect(result).toBe("entrance failed|color:red|false");
 });
+
+test("acc restores authored CSS priorities", async ({ open }) => {
+  const page = await open("component-motion");
+  const result = await page.evaluate(() => {
+    const w = window as any;
+    const el = document.getElementById("acc")!;
+    el.style.setProperty("height", "80px", "important");
+    const before = [el.style.getPropertyValue("height"), el.style.getPropertyPriority("height")];
+    const effect = w.CM.disclosure(el);
+    effect.close().progress(1); effect.revert(); effect.revert();
+    return { before, after: [el.style.getPropertyValue("height"), el.style.getPropertyPriority("height")] };
+  });
+  expect(result.after).toEqual(result.before);
+});

@@ -300,3 +300,17 @@ test("underlineSweep draws from the inline start in right-to-left text", async (
   expect(origin).toBe("100% 50%");
   await page.evaluate(() => (window as any).sweep());
 });
+
+test("link2 restores authored CSS priorities", async ({ open }) => {
+  const page = await open("hover-effects");
+  const result = await page.evaluate(() => {
+    const w = window as any;
+    const el = document.getElementById("link2")!;
+    el.style.setProperty("position", "relative", "important");
+    const before = [el.style.getPropertyValue("position"), el.style.getPropertyPriority("position")];
+    const effect = w.HE.underlineSweep(el);
+    effect(); effect();
+    return { before, after: [el.style.getPropertyValue("position"), el.style.getPropertyPriority("position")] };
+  });
+  expect(result.after).toEqual(result.before);
+});

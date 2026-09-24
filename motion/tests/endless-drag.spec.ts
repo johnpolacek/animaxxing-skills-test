@@ -339,3 +339,46 @@ test.describe("touch", () => {
     }
   });
 });
+
+test("i0 restores authored CSS priorities", async ({ open }) => {
+  const page = await open("endless-drag");
+  const result = await page.evaluate(() => {
+    const w = window as any;
+    const el = document.getElementById("i0")!;
+    el.style.setProperty("transform", "translateX(3px)", "important");
+    const before = [el.style.getPropertyValue("transform"), el.style.getPropertyPriority("transform")];
+    const effect = w.ED.dragLoop(document.getElementById("lvp"), document.getElementById("ltr"));
+    effect.revert(); effect.revert();
+    return { before, after: [el.style.getPropertyValue("transform"), el.style.getPropertyPriority("transform")] };
+  });
+  expect(result.after).toEqual(result.before);
+});
+
+for (const reduced of [false, true]) {
+  test(`keyboard focus reveals the original after a cloned set wraps (reduced=${reduced})`, async ({ open }) => {
+    const page = await open("endless-drag");
+    await page.evaluate((reduced) => {
+      document.getElementById("lvp")!.style.width = "500px";
+      if (reduced) document.documentElement.dataset.motion = "reduced";
+    }, reduced);
+    const before = await page.$eval("#lvp", el => el.outerHTML);
+    // Keep the keyboard glide running past the wheel's delayed snap deadline.
+    await loop(page, "{ duration: 1.2 }");
+    await page.hover("#lvp");
+    await page.mouse.wheel(660, 0);
+    await expect.poll(() => position(page)).toBe(-660);
+    await page.focus("#before");
+    for (const id of ["i0", "i1", "i2"]) {
+      await page.keyboard.press("Tab");
+      await expect(page.locator(`#${id}`)).toBeFocused();
+      await expect.poll(() => page.evaluate(() => {
+        const viewport = document.getElementById("lvp")!;
+        const box = viewport.getBoundingClientRect();
+        const focused = document.activeElement!.getBoundingClientRect();
+        return focused.left >= box.left - 1 && focused.right <= box.right + 1 && viewport.scrollLeft === 0;
+      })).toBe(true);
+    }
+    await page.evaluate(() => { (window as any).loop.revert(); (window as any).loop.revert(); });
+    expect(await page.$eval("#lvp", el => el.outerHTML)).toBe(before);
+  });
+}

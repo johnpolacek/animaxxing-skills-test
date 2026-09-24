@@ -352,3 +352,17 @@ test("an image inside <picture> settles its <img>, which transforms can move", a
   });
   expect(scale).toBeGreaterThan(1.05);
 });
+
+test("f1 restores authored CSS priorities", async ({ open }) => {
+  const page = await open("media-effects");
+  const result = await page.evaluate(() => {
+    const w = window as any;
+    const el = document.getElementById("f1")!;
+    el.style.setProperty("clip-path", "inset(2px)", "important");
+    const before = [el.style.getPropertyValue("clip-path"), el.style.getPropertyPriority("clip-path")];
+    const effect = w.ME.imageReveal(el);
+    effect.timeline.progress(0.5); effect.revert(); effect.revert();
+    return { before, after: [el.style.getPropertyValue("clip-path"), el.style.getPropertyPriority("clip-path")] };
+  });
+  expect(result.after).toEqual(result.before);
+});

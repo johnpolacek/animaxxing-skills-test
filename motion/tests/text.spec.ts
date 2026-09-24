@@ -319,3 +319,26 @@ test("a highlight run killed mid-sweep restores the text with no bars", async ({
   });
   expect(await page.$eval("#hl", (el) => el.innerHTML)).toBe(original);
 });
+
+for (const sample of [{ reduced: false, progress: 0.5 }, { reduced: false, progress: 1 }, { reduced: true, progress: 1 }]) {
+  test(`blast-off preserves authored styles (reduced=${sample.reduced}, progress=${sample.progress})`, async ({ open }) => {
+    const page = await open("text");
+    const result = await page.evaluate((sample) => {
+      if (sample.reduced) document.documentElement.dataset.motion = "reduced";
+      const root = document.getElementById("hero")!;
+      const pressed = document.getElementById("go")!;
+      const other = document.getElementById("other")!;
+      root.style.setProperty("transform", "translateX(24px)", "important");
+      pressed.style.setProperty("filter", "contrast(1.2)", "important");
+      other.style.filter = "brightness(0.8)";
+      const read = () => [root.style.transform, root.style.getPropertyPriority("transform"), pressed.style.filter, pressed.style.getPropertyPriority("filter"), other.style.filter];
+      const before = read();
+      const blast = (window as any).B.blastOff({ root, heading: document.getElementById("hh"), pressed, others: [other], words: [] });
+      blast.timeline.progress(sample.progress);
+      blast.revert();
+      blast.revert();
+      return { before, after: read() };
+    }, sample);
+    expect(result.after).toEqual(result.before);
+  });
+}

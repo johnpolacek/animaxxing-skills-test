@@ -1,8 +1,4 @@
-name: Motion recipes
-
-# Type-checks every animaxxing recipe and runs the motion suite in Chromium.
-# Recipes live in animaxxing-skills and specs in animaxxing-skills-test, so
-# both repositories run this job, each checking out the other alongside it.
+name: Browser verification
 
 on:
   push:
@@ -10,23 +6,34 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      companion_ref:
+        description: Branch or commit of the companion repository
+        default: main
+        required: false
 
 permissions:
   contents: read
 
 jobs:
-  motion:
+  browser:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [vanilla, nextjs, astro, sveltekit, nuxt, react-router, tanstack, motion]
     steps:
       - name: Check out this repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           path: animaxxing-skills-test
 
-      - name: Check out animaxxing-skills
+      - name: Check out the companion repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: johnpolacek/animaxxing-skills
+          ref: ${{ inputs.companion_ref || 'main' }}
           path: animaxxing-skills
 
       - name: Set up Node.js
@@ -37,22 +44,23 @@ jobs:
       - name: Enable pnpm
         run: corepack enable
 
-      - name: Install the motion suite
+      - name: Install the test workspace
         working-directory: animaxxing-skills-test
-        run: pnpm install --frozen-lockfile --filter animaxxing-skills-test --filter motion-recipes
+        run: pnpm install --frozen-lockfile
 
       - name: Install Chromium
         working-directory: animaxxing-skills-test
         run: pnpm exec playwright install --with-deps chromium
 
-      - name: Run the motion suite
+      - name: Run browser checks
         working-directory: animaxxing-skills-test
-        run: pnpm test:motion
+        run: pnpm exec playwright test -c ${{ matrix.suite }}/playwright.config.ts
 
       - name: Upload traces on failure
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: motion-test-results
-          path: animaxxing-skills-test/motion/test-results
+          name: ${{ matrix.suite }}-test-results
+          path: animaxxing-skills-test/${{ matrix.suite }}/test-results
           retention-days: 7
+

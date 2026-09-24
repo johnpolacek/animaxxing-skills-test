@@ -215,3 +215,80 @@ test("reduced motion shows the control with no particles and no hot state", asyn
   expect(await page.evaluate(() => (window as any).hot)).toEqual([]);
   await page.evaluate(() => (window as any).fx.destroy());
 });
+
+test("btn restores authored CSS priorities", async ({ open }) => {
+  const page = await open("particles");
+  const result = await page.evaluate(() => {
+    const w = window as any;
+    const el = document.getElementById("btn")!;
+    el.style.setProperty("opacity", "0.8", "important");
+    const before = [el.style.getPropertyValue("opacity"), el.style.getPropertyPriority("opacity")];
+    const effect = w.A.attachParticleEffect(document.getElementById("wrap"), document.getElementById("cv"), el, w.FX.reactor);
+    effect.enter(); effect.destroy(); effect.destroy();
+    return { before, after: [el.style.getPropertyValue("opacity"), el.style.getPropertyPriority("opacity")] };
+  });
+  expect(result.after).toEqual(result.before);
+});
+
+test("particle setup rolls back target and canvas when a factory throws", async ({ open }) => {
+  const page = await open("particles");
+  const result = await page.evaluate(() => {
+    const target = document.getElementById("btn")!;
+    const canvas = document.getElementById("cv")!;
+    // Empty style attributes and absent ones are equivalent (the same convention as rollback.spec).
+    const read = () => [target.outerHTML, canvas.outerHTML].map(html => html.replaceAll(' style=""', ""));
+    const before = read();
+    let error = "";
+    try {
+      (window as any).A.attachParticleEffect(document.getElementById("wrap"), canvas, target, {
+        bleed: 100,
+        create(field: any, button: HTMLElement) {
+          button.style.opacity = "0";
+          field.spawn({ x: 0, y: 0, life: Infinity });
+          throw new Error("setup failure");
+        },
+      });
+    } catch (caught) { error = (caught as Error).message; }
+    return { before, after: read(), error };
+  });
+  expect(result.error).toBe("setup failure");
+  expect(result.after).toEqual(result.before);
+});
+
+for (const failure of ["observe", "destroy"]) {
+  test(`particle cleanup restores resources even when ${failure} throws`, async ({ open }) => {
+    const page = await open("particles");
+    const result = await page.evaluate((failure) => {
+      const { A, FX, gsap } = window as any;
+      const root = document.getElementById("wrap")!;
+      const canvas = document.getElementById("cv")!;
+      const target = document.getElementById("btn")!;
+      const read = () => root.outerHTML.replaceAll(' style=""', "");
+      const before = read();
+      const observe = ResizeObserver.prototype.observe;
+      let cleaned = 0;
+      let field: any;
+      const broken = { ...FX.reactor, create(f: any, t: HTMLElement) {
+        field = f;
+        const instance = FX.reactor.create(f, t);
+        gsap.to(t, { opacity: 0, duration: 5 });
+        return { ...instance, destroy() { cleaned++; instance.destroy(); throw new Error("destroy failure"); } };
+      } };
+      let error = "";
+      try {
+        if (failure === "observe") ResizeObserver.prototype.observe = () => { throw new Error("observe failure"); };
+        const controls = A.attachParticleEffect(root, canvas, target, broken);
+        try { controls.destroy(); } finally { controls.destroy(); controls.enter(); controls.idle(); }
+      } catch (caught) { error = (caught as Error).message; }
+      finally { ResizeObserver.prototype.observe = observe; }
+      // A queued resize must not mutate a destroyed field's restored canvas.
+      field.sync();
+      return { before, after: read(), error, cleaned, tweens: gsap.getTweensOf(target).length, currentContext: !!gsap.context() };
+    }, failure);
+    expect(result.error).toBe(`${failure} failure`);
+    expect(result.cleaned).toBe(1);
+    expect(result.tweens).toBe(0);
+    expect(result.currentContext).toBe(false);
+    expect(result.after).toBe(result.before);
+  });
+}

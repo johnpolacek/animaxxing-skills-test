@@ -397,3 +397,17 @@ test("a proximity setup that throws rolls back and rethrows", async ({ open }) =
   expect(result).toBe("SyntaxError|false");
   expect(await declarations(page, "#pt1")).toEqual(await declared(page, PT));
 });
+
+test("mag restores authored CSS priorities", async ({ open }) => {
+  const page = await open("pointer-effects");
+  const result = await page.evaluate(() => {
+    const w = window as any;
+    const el = document.getElementById("mag")!;
+    el.style.setProperty("transform", "translateX(3px)", "important");
+    const before = [el.style.getPropertyValue("transform"), el.style.getPropertyPriority("transform")];
+    const effect = w.P.magnetic(el);
+    effect(); effect();
+    return { before, after: [el.style.getPropertyValue("transform"), el.style.getPropertyPriority("transform")] };
+  });
+  expect(result.after).toEqual(result.before);
+});

@@ -289,3 +289,17 @@ test("Space on a checkbox or tab role toggles it without paging", async ({ open 
   await page.waitForTimeout(400);
   expect(await index(page)).toBe(0);
 });
+
+test("pager restores authored CSS priorities", async ({ open }) => {
+  const page = await open("section-pager");
+  const result = await page.evaluate(() => {
+    const w = window as any;
+    const el = document.getElementById("pager")!;
+    el.style.setProperty("overflow", "auto", "important");
+    const before = [el.style.getPropertyValue("overflow"), el.style.getPropertyPriority("overflow")];
+    const effect = w.SP.sectionPager(el);
+    effect.revert(); effect.revert();
+    return { before, after: [el.style.getPropertyValue("overflow"), el.style.getPropertyPriority("overflow")] };
+  });
+  expect(result.after).toEqual(result.before);
+});

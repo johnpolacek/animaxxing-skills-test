@@ -200,3 +200,17 @@ test("a jump into a page taller than Lenis last measured still lands", async ({ 
   });
   expect(Math.abs(result.y - result.target)).toBeLessThanOrEqual(2);
 });
+
+test("document restores authored CSS priorities", async ({ open }) => {
+  const page = await open("smoother");
+  const result = await page.evaluate(() => {
+    const w = window as any;
+    const el = document.documentElement;
+    el.style.setProperty("scroll-behavior", "smooth", "important");
+    const before = [el.style.getPropertyValue("scroll-behavior"), el.style.getPropertyPriority("scroll-behavior")];
+    const effect = w.SM.smootherScroll(document.getElementById("smooth-wrapper"), document.getElementById("smooth-content"));
+    effect.destroy(); effect.destroy();
+    return { before, after: [el.style.getPropertyValue("scroll-behavior"), el.style.getPropertyPriority("scroll-behavior")] };
+  });
+  expect(result.after).toEqual(result.before);
+});

@@ -398,3 +398,17 @@ test("a curve cover under reduced motion never shows and still completes; a miss
   });
   expect(result).toEqual({ seen: false, style: "", thrown: "curveCover needs a <path> inside its <svg>", nopath: "position:fixed;width:0;height:0" });
 });
+
+test("curve restores authored CSS priorities", async ({ open }) => {
+  const page = await open("page-covers");
+  const result = await page.evaluate(() => {
+    const w = window as any;
+    const el = document.getElementById("curve")!;
+    el.style.setProperty("visibility", "visible", "important");
+    const before = [el.style.getPropertyValue("visibility"), el.style.getPropertyPriority("visibility")];
+    const effect = w.PC.curveCover(el);
+    effect.cover().progress(0.5); effect.revert(); effect.revert();
+    return { before, after: [el.style.getPropertyValue("visibility"), el.style.getPropertyPriority("visibility")] };
+  });
+  expect(result.after).toEqual(result.before);
+});

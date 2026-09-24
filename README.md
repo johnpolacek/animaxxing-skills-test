@@ -36,6 +36,8 @@ pnpm test
 
 Or one suite: `pnpm test:motion`, `pnpm test:vanilla`, `pnpm test:nextjs`, `pnpm test:astro`, `pnpm test:sveltekit`, `pnpm test:nuxt`, `pnpm test:react-router`, `pnpm test:tanstack`.
 
+Both repositories run all eight suites in the `Browser verification` GitHub Actions matrix on pushes and pull requests. The companion repository defaults to `main`; a manual workflow run accepts `companion_ref` to test coordinated branches or commits. Failed jobs retain Playwright traces for seven days.
+
 ## Verify a skill end to end
 
 `scripts/eval.sh <framework>` copies the starter to `<framework>/app-eval`, installs the skill there, runs Claude Code non-interactively on `TASK.md`, and then runs the framework's specs against the result. A green run means an agent following the skill produced an implementation that meets the contract.
@@ -77,3 +79,5 @@ SKILLS_REPO=/path/to/animaxxing-skills pnpm test:motion
 ```
 
 Every recipe is covered: split entrances, route letters, speak-in, wave, blast-off, particle field and effects, scroll, pointer, SVG, counters and marquees, smooth scroll, page covers, layout Flip, media, component motion, hover, section pager, sound cues, endless drag, physics effects, and the `animaxxing-webgl` stage, image planes, and uniform effects. Multi-module recipes are split on their `## file.ts` headings; `## Wiring` blocks and `// Example` blocks are usage and are skipped. Each spec checks visible behavior, completion callbacks, reduced motion, and teardown that restores the original markup and inline styles. The newer recipes also check rollback when setup throws. To add or change a recipe's tests, follow [CLAUDE.md](CLAUDE.md). The [Animaxxing](https://github.com/johnpolacek/animaxxing) demo remains the reference for how the recipes look with `style-animaxxing`.
+
+Regression coverage includes authored CSS values and `!important` priorities, blast-off interruption and completion, focused headers using CSS extracted from the recipe, keyboard focus after gallery wrapping and pending wheel snaps, and particle construction/teardown failures. WebGL tests sample rendered pixels for hidden wrappers and lens distortion, and validate constant shader `smoothstep` edges; SwiftShader does not establish hardware GPU performance.

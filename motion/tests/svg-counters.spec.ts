@@ -314,3 +314,31 @@ test("morphScrub under reduced motion keeps the authored shape", async ({ open }
   expect(await page.$eval("#curve", (el) => el.getAttribute("d"))).toBe(original);
   await page.evaluate(() => (window as any).ms());
 });
+
+test("p1 restores authored CSS priorities", async ({ open }) => {
+  const page = await open("svg-counters");
+  const result = await page.evaluate(() => {
+    const w = window as any;
+    const el = document.getElementById("p1")!;
+    el.style.setProperty("stroke-dashoffset", "3px", "important");
+    const before = [el.style.getPropertyValue("stroke-dashoffset"), el.style.getPropertyPriority("stroke-dashoffset")];
+    const effect = w.V.drawIn(el);
+    effect.timeline.progress(0.5); effect.revert(); effect.revert();
+    return { before, after: [el.style.getPropertyValue("stroke-dashoffset"), el.style.getPropertyPriority("stroke-dashoffset")] };
+  });
+  expect(result.after).toEqual(result.before);
+});
+
+test("n1 restores authored CSS priorities", async ({ open }) => {
+  const page = await open("svg-counters");
+  const result = await page.evaluate(() => {
+    const w = window as any;
+    const el = document.getElementById("n1")!;
+    el.style.setProperty("min-width", "80px", "important");
+    const before = [el.style.getPropertyValue("min-width"), el.style.getPropertyPriority("min-width")];
+    const effect = w.C.countUp(el);
+    effect.timeline.progress(0.5); effect.revert(); effect.revert();
+    return { before, after: [el.style.getPropertyValue("min-width"), el.style.getPropertyPriority("min-width")] };
+  });
+  expect(result.after).toEqual(result.before);
+});
