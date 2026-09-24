@@ -1,0 +1,26 @@
+<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>
+body{margin:0;font:16px sans-serif}
+header{position:fixed;top:0;left:0;z-index:10}
+img{display:block;width:400px;max-width:calc(100vw - 80px);height:250px;object-fit:cover;margin:40px}
+#far{margin-top:2400px}
+#cors{position:absolute;top:0;right:0;display:flex}#cors img{width:100px;height:60px;margin:0}
+</style></head><body>
+<header><a href="#x" id="first">First</a></header>
+<div id="cors"><img id="cors-open" alt="Open CORS" src="http://cors.test/open.png"><img id="cors-closed" alt="Closed CORS" src="http://cors.test/closed.png"></div>
+<img id="a" alt="Red field">
+<a href="#x" id="link"><img id="hover" alt="Green field" style="outline: 1px solid rgb(1, 2, 3);"></a>
+<img id="far" alt="Blue field">
+<script>
+// Same-origin pixels: data URLs never taint a canvas.
+const paint = (color, w = 64, h = 32) => {
+  const c = document.createElement("canvas");
+  c.width = w; c.height = h;
+  const x = c.getContext("2d");
+  x.fillStyle = color; x.fillRect(0, 0, w, h);
+  return c.toDataURL();
+};
+document.getElementById("a").src = paint("#c33");
+document.getElementById("hover").src = paint("#3c3");
+document.getElementById("far").src = paint("#33c");
+</script>
+<script src="../.build/webgl.js"></script></body></html>
