@@ -20,5 +20,21 @@ export { expect };
 export const style = (page: Page, selector: string) =>
   page.$eval(selector, (el) => el.getAttribute("style") ?? "");
 
+/** Inline declarations as a sorted list, so equal styles compare equal whatever their serialization. */
+export const declarations = (page: Page, selector: string) =>
+  page.$eval(selector, (el) => {
+    const probe = document.createElement("div");
+    probe.setAttribute("style", el.getAttribute("style") ?? "");
+    return Array.from(probe.style).map((name) => `${name}: ${probe.style.getPropertyValue(name)}`).sort();
+  });
+
+/** The same list for a literal style string. */
+export const declared = (page: Page, css: string) =>
+  page.evaluate((text) => {
+    const probe = document.createElement("div");
+    probe.setAttribute("style", text);
+    return Array.from(probe.style).map((name) => `${name}: ${probe.style.getPropertyValue(name)}`).sort();
+  }, css);
+
 export const prop = (page: Page, selector: string, name: string) =>
   page.evaluate(([s, n]) => Number((window as any).gsap.getProperty(s, n)), [selector, name] as const);

@@ -1,4 +1,4 @@
-import { test, expect, style, prop } from "./fixture";
+import { test, expect, style, prop, declarations, declared } from "./fixture";
 
 // Recipe: animaxxing/references/recipes/page-covers.md
 
@@ -135,4 +135,40 @@ test("preloader under reduced motion jumps to progress and hides at once", async
     return { count, fired, visibility: getComputedStyle(document.getElementById("pre")!).visibility };
   });
   expect(result).toEqual({ count: "40", fired: 1, visibility: "hidden" });
+});
+
+test("curtain tilt leans panels in and out; the title shows while covered and restores", async ({ open }) => {
+  const page = await open("page-covers");
+  const result = await page.evaluate(async () => {
+    const w = window as any;
+    document.getElementById("pre")!.style.display = "none";
+    const title = document.getElementById("ctitle")!;
+    const panel = document.querySelector(".curtain-panel")!;
+    const c = w.PC.curtain(".curtain-panel", { duration: 0.3, stagger: 0, tilt: 8, title });
+    const rotation = () => Number(w.gsap.getProperty(panel, "rotation"));
+    // Extremes of the lean while each sweep runs.
+    const run = async (tl: any) => {
+      let min = Infinity;
+      let max = -Infinity;
+      tl.eventCallback("onUpdate", () => {
+        min = Math.min(min, rotation());
+        max = Math.max(max, rotation());
+      });
+      await new Promise((resolve) => tl.eventCallback("onComplete", resolve));
+      return [min, max];
+    };
+    const cover = await run(c.cover("About"));
+    const covered = [rotation(), title.textContent, getComputedStyle(title).visibility];
+    const reveal = await run(c.reveal());
+    const revealed = getComputedStyle(title).visibility;
+    c.revert();
+    return { cover, covered, reveal, revealed, text: title.textContent };
+  });
+  expect(result.cover[1]).toBeGreaterThan(4);
+  expect(result.covered).toEqual([0, "About", "visible"]);
+  expect(result.reveal[0]).toBeLessThan(-4);
+  expect(result.revealed).toBe("hidden");
+  expect(result.text).toBe("Old");
+  expect(await declarations(page, "#ctitle")).toEqual(await declared(page, "position:absolute;inset:0;margin:0;color:#fff;visibility:hidden"));
+  expect(await page.$$eval(".curtain-panel", (panels) => panels.map((panel) => panel.getAttribute("style") ?? ""))).toEqual(["", "", ""]);
 });

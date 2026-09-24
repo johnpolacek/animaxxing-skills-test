@@ -1,4 +1,4 @@
-import { test, expect, style } from "./fixture";
+import { test, expect, style, declarations, declared } from "./fixture";
 
 // Recipe: animaxxing/references/recipes/scroll-effects.md
 
@@ -186,3 +186,59 @@ test("reduced motion builds nothing except the progress rule", async ({ open }) 
   expect(await style(page, "#r2")).toBe("");
 });
 
+
+test("revealOnScroll takes a pop: scale, rotation, and ease, cleared once revealed", async ({ open }) => {
+  const page = await open("scroll-effects");
+  await page.evaluate(() => {
+    (window as any).t = (window as any).S.revealOnScroll("#r0", { scale: 0, rotation: -20, y: -32, duration: 0.5, ease: "elastic.out(1, 0.72)" });
+  });
+  await expect.poll(() => style(page, "#r0")).toBe("");
+  await page.evaluate(() => {
+    window.scrollTo(0, 0);
+    (window as any).t();
+    (window as any).t = (window as any).S.revealOnScroll("#plop", { scale: 0, rotation: -20 });
+  });
+  expect(await page.evaluate(() => [(window as any).gsap.getProperty("#plop", "scale"), (window as any).gsap.getProperty("#plop", "rotation")])).toEqual([0, -20]);
+  await page.evaluate(() => (window as any).t());
+  expect(await declarations(page, "#plop")).toEqual(await declared(page, "width:40px;height:40px"));
+});
+
+test("parallax takes start and end, so a footer's travel completes at the page bottom", async ({ open }) => {
+  const page = await open("scroll-effects");
+  await page.evaluate(() => ((window as any).t = (window as any).S.parallax(document.getElementById("foot"), { end: "bottom bottom" })));
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await expect.poll(() => page.evaluate(() => Number((window as any).gsap.getProperty("#footin", "y")))).toBeCloseTo(-80, 0);
+  await page.evaluate(() => (window as any).t());
+  expect(await style(page, "#footin")).toBe("");
+});
+
+test("navTheme mirrors the section under the header's middle and restores", async ({ open }) => {
+  const page = await open("scroll-effects");
+  await page.evaluate(() => ((window as any).t = (window as any).S.navTheme(document.getElementById("hdr"))));
+  await expect.poll(() => page.$eval("#hdr", (el) => el.getAttribute("data-nav-theme"))).toBe("dark");
+  await page.evaluate(() => window.scrollTo(0, document.getElementById("stmt")!.offsetTop));
+  await expect.poll(() => page.$eval("#hdr", (el) => el.getAttribute("data-nav-theme"))).toBe("light");
+  await page.evaluate(() => window.scrollTo(0, document.getElementById("top")!.offsetTop + 10));
+  await expect.poll(() => page.$eval("#hdr", (el) => el.getAttribute("data-nav-theme"))).toBe("dark");
+  await page.evaluate(() => (window as any).t());
+  expect(await page.$eval("#hdr", (el) => el.hasAttribute("data-nav-theme"))).toBe(false);
+  expect(await page.evaluate(() => (window as any).ST.getAll().length)).toBe(0);
+});
+
+test("scrollDirection flips past the threshold, marks the start, and restores", async ({ open }) => {
+  const page = await open("scroll-effects");
+  await page.evaluate(() => ((window as any).t = (window as any).S.scrollDirection(undefined, { top: 50, threshold: 20 })));
+  const read = () => page.evaluate(() => [document.documentElement.dataset.scrollDirection, document.documentElement.dataset.scrollStarted]);
+  expect(await read()).toEqual(["up", "false"]);
+  await page.evaluate(() => window.scrollTo(0, 400));
+  await expect.poll(read).toEqual(["down", "true"]);
+  await page.evaluate(() => window.scrollTo(0, 390));
+  await page.waitForTimeout(100);
+  expect((await read())[0]).toBe("down");
+  await page.evaluate(() => window.scrollTo(0, 300));
+  await expect.poll(read).toEqual(["up", "true"]);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect.poll(read).toEqual(["up", "false"]);
+  await page.evaluate(() => (window as any).t());
+  expect(await read()).toEqual([undefined, undefined]);
+});

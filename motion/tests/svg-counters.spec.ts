@@ -243,3 +243,35 @@ test("reduced motion shows strokes whole, figures final, and a still marquee", a
   });
   expect(result).toEqual({ fired: true, dash: "none", text: "12,480", clones: 0 });
 });
+
+test("logoCycle swaps one cell at a time through the pool, holds on pause, and restores", async ({ open }) => {
+  const page = await open("svg-counters");
+  const before = await page.evaluate(() => document.getElementById("lg")!.outerHTML + document.getElementById("lpool")!.outerHTML);
+  await page.evaluate(() => ((window as any).cycle = (window as any).C.logoCycle(document.getElementById("lg"), document.getElementById("lpool"), { interval: 0.2, duration: 0.2 })));
+  const shown = () => page.$$eval("[data-logo-cell]", (cells) => cells.map((cell) => cell.textContent));
+  await expect.poll(async () => (await shown()).join()).not.toBe("L0,L1");
+  // Swaps settle to one logo per cell; the pool keeps the rest, so four logos still exist once each.
+  await page.waitForTimeout(250);
+  const all = await page.$$eval("#L0, #L1, #L2, #L3", (els) => els.length);
+  expect(all).toBe(4);
+  await page.evaluate(() => (window as any).cycle.pause());
+  await page.waitForTimeout(300);
+  const held = await shown();
+  await page.waitForTimeout(600);
+  expect(await shown()).toEqual(held);
+  await page.evaluate(() => {
+    (window as any).cycle.revert();
+    (window as any).cycle.revert();
+  });
+  expect(await page.evaluate(() => document.getElementById("lg")!.outerHTML + document.getElementById("lpool")!.outerHTML)).toBe(before);
+});
+
+test("logoCycle under reduced motion leaves the grid as it is", async ({ open }) => {
+  const page = await open("svg-counters");
+  await page.evaluate(() => {
+    document.documentElement.dataset.motion = "reduced";
+    (window as any).cycle = (window as any).C.logoCycle(document.getElementById("lg"), document.getElementById("lpool"), { interval: 0.1 });
+  });
+  await page.waitForTimeout(500);
+  expect(await page.$$eval("[data-logo-cell]", (cells) => cells.map((cell) => cell.textContent))).toEqual(["L0", "L1"]);
+});

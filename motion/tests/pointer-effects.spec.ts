@@ -1,4 +1,4 @@
-import { test, expect, style, prop } from "./fixture";
+import { test, expect, style, prop, declarations, declared } from "./fixture";
 
 // Recipe: animaxxing/references/recipes/pointer-effects.md
 
@@ -231,4 +231,76 @@ test("momentum hover ignores a still pointer, touch, and reduced motion", async 
   await page.mouse.move(300, 610, { steps: 4 });
   await page.waitForTimeout(200);
   expect(await style(page, "#mt1")).toBe("display: block; width: 60px; height: 60px; background: rgb(255, 153, 153);");
+});
+
+test("image trail spawns hidden images along the path, caps them, removes them, and restores", async ({ open }) => {
+  const page = await open("pointer-effects");
+  await page.evaluate(() => {
+    const w = window as any;
+    const images = [...document.querySelectorAll("#timgs img")];
+    w.t = w.P.imageTrail(document.getElementById("trail"), document.getElementById("tlayer"), images, { spacing: 30, max: 3, life: 0.6 });
+  });
+  await page.mouse.move(660, 280);
+  await page.mouse.move(940, 280, { steps: 20 });
+  const images = await page.$$eval("#tlayer img", (els) => els.map((el) => [el.getAttribute("alt"), el.getAttribute("aria-hidden"), el.id]));
+  expect(images.length).toBeGreaterThan(0);
+  expect(images.length).toBeLessThanOrEqual(3);
+  expect(images.every(([alt, hidden, id]) => alt === "" && hidden === "true" && id === "")).toBe(true);
+  await expect.poll(() => page.$$eval("#tlayer img", (els) => els.length)).toBe(0);
+  await page.mouse.move(660, 300, { steps: 20 });
+  await page.evaluate(() => {
+    (window as any).t();
+    (window as any).t();
+  });
+  expect(await page.$$eval("#tlayer img", (els) => els.length)).toBe(0);
+  expect(await page.$$eval("#timgs img", (els) => els.length)).toBe(2);
+});
+
+test("image trail ignores touch and reduced motion", async ({ open }) => {
+  const page = await open("pointer-effects");
+  await page.evaluate(() => {
+    const w = window as any;
+    w.t = w.P.imageTrail(document.getElementById("trail"), document.getElementById("tlayer"), [...document.querySelectorAll("#timgs img")], { spacing: 5 });
+    const area = document.getElementById("trail")!;
+    for (let x = 660; x < 900; x += 20) area.dispatchEvent(new PointerEvent("pointermove", { pointerType: "touch", clientX: x, clientY: 280, bubbles: true }));
+  });
+  expect(await page.$$eval("#tlayer img", (els) => els.length)).toBe(0);
+  await page.evaluate(() => {
+    const w = window as any;
+    w.t();
+    document.documentElement.dataset.motion = "reduced";
+    w.t = w.P.imageTrail(document.getElementById("trail"), document.getElementById("tlayer"), [...document.querySelectorAll("#timgs img")], { spacing: 5 });
+  });
+  await page.mouse.move(660, 280);
+  await page.mouse.move(900, 280, { steps: 10 });
+  expect(await page.$$eval("#tlayer img", (els) => els.length)).toBe(0);
+});
+
+test("cursor label scrolls the hovered text in place of the dot, hides on leave, and restores", async ({ open }) => {
+  const page = await open("pointer-effects");
+  await page.evaluate(() => {
+    const w = window as any;
+    w.t = w.P.cursorFollower(document.getElementById("cur"), { label: document.getElementById("clabel") });
+  });
+  await page.mouse.move(300, 350, { steps: 3 });
+  await page.mouse.move(850, 40, { steps: 5 });
+  await page.waitForTimeout(400);
+  expect(await page.$eval("#cur", (el) => (el as HTMLElement).dataset.cursorState)).toBe("label");
+  expect(await page.$eval("#clabel", (el) => getComputedStyle(el).visibility)).toBe("visible");
+  expect(await page.$$eval("#ctrack span", (els) => els.map((el) => el.textContent!.startsWith("View project")))).toEqual([true, true]);
+  const x1 = await prop(page, "#ctrack", "x");
+  await page.waitForTimeout(300);
+  expect(await prop(page, "#ctrack", "x")).toBeLessThan(x1);
+  await page.mouse.move(300, 350, { steps: 5 });
+  await page.waitForTimeout(400);
+  expect(await page.$eval("#clabel", (el) => getComputedStyle(el).visibility)).toBe("hidden");
+  await page.evaluate(() => {
+    (window as any).t();
+    (window as any).t();
+  });
+  expect(await page.$eval("#ctrack", (el) => el.childNodes.length)).toBe(0);
+  expect(await style(page, "#ctrack")).toBe("");
+  expect(await declarations(page, "#clabel")).toEqual(
+    await declared(page, "position:fixed;left:0;top:0;width:9em;overflow:hidden;white-space:nowrap;visibility:hidden;pointer-events:none"),
+  );
 });
