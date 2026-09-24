@@ -57,6 +57,7 @@ const RECIPES = [
   "hover-effects",
   "section-pager",
   "sound-cues",
+  "endless-drag",
   "webgl-stage",
   "image-planes",
   "uniform-effects",
@@ -91,12 +92,13 @@ const ENTRIES = {
   particles: `import * as A from "./attach"; import * as FX from "./particle-effects"; import gsap from "gsap"; Object.assign(window, { A, FX, gsap });`,
   "smooth-scroll": `import * as SC from "./scroll-controls"; import * as L from "./lenis-scroll"; import * as SM from "./smoother-scroll"; import gsap from "gsap"; import { ScrollTrigger } from "gsap/ScrollTrigger"; Object.assign(window, { SC, L, SM, gsap, ST: ScrollTrigger });`,
   "page-covers": `import * as PC from "./page-covers"; import gsap from "gsap"; Object.assign(window, { PC, gsap });`,
-  "layout-flip": `import * as LF from "./layout-flip"; import gsap from "gsap"; import { Flip } from "gsap/Flip"; Object.assign(window, { LF, gsap, Flip });`,
+  "layout-flip": `import * as LF from "./layout-flip"; import gsap from "gsap"; import { Flip } from "gsap/Flip"; import { CustomEase } from "gsap/CustomEase"; gsap.registerPlugin(CustomEase); Object.assign(window, { LF, gsap, Flip, CustomEase });`,
   "media-effects": `import * as ME from "./media-effects"; import gsap from "gsap"; import { ScrollTrigger } from "gsap/ScrollTrigger"; Object.assign(window, { ME, gsap, ST: ScrollTrigger });`,
-  "component-motion": `import * as CM from "./component-motion"; import gsap from "gsap"; Object.assign(window, { CM, gsap });`,
+  "component-motion": `import * as CM from "./component-motion"; import gsap from "gsap"; import { CustomEase } from "gsap/CustomEase"; gsap.registerPlugin(CustomEase); Object.assign(window, { CM, gsap, CustomEase });`,
   "hover-effects": `import * as HE from "./hover-effects"; import gsap from "gsap"; Object.assign(window, { HE, gsap });`,
   "section-pager": `import * as SP from "./section-pager"; import gsap from "gsap"; import { Observer } from "gsap/Observer"; Object.assign(window, { SP, gsap, Observer });`,
   "sound-cues": `import * as SO from "./sound-cues"; import gsap from "gsap"; Object.assign(window, { SO, gsap });`,
+  "endless-drag": `import * as ED from "./endless-drag"; import gsap from "gsap"; import { CustomEase } from "gsap/CustomEase"; gsap.registerPlugin(CustomEase); Object.assign(window, { ED, gsap, CustomEase });`,
   webgl: `import * as WS from "./webgl-stage"; import * as IP from "./image-planes"; import * as UE from "./uniform-effects"; import gsap from "gsap"; import { ScrollTrigger } from "gsap/ScrollTrigger"; Object.assign(window, { WS, IP, UE, gsap, ST: ScrollTrigger });`,
 };
 /** Entries whose recipes were built; the original five bundle several recipes each. */
@@ -106,6 +108,7 @@ const ENTRY_RECIPES = {
   "smooth-scroll": ["smooth-scroll"], "page-covers": ["page-covers"], "layout-flip": ["layout-flip"],
   "media-effects": ["media-effects"], "component-motion": ["component-motion"], "hover-effects": ["hover-effects"],
   "section-pager": ["section-pager"], "sound-cues": ["sound-cues"],
+  "endless-drag": ["endless-drag"],
   webgl: ["webgl-stage", "image-planes", "uniform-effects"],
 };
 for (const [name, code] of Object.entries(ENTRIES)) {
