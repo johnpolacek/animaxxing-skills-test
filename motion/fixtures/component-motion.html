@@ -9,6 +9,8 @@ dialog.drawer{margin:0 0 0 auto;height:100%;max-height:none;width:280px}
 .panel p{margin:0;padding:16px;height:120px}
 .tabs{position:relative;display:flex;gap:8px;width:600px;margin-top:20px}
 .tabs button{padding:8px 16px;background:none;border:0;font:inherit}
+#ee{position:fixed;right:20px;bottom:20px;width:200px;pointer-events:none;background:#ddd;padding:8px}
+#ee span{display:block}
 .tab-indicator{position:absolute;inset-inline-start:0;bottom:0;width:40px;height:2px;background:#000}
 </style></head><body>
 <button id="menu-toggle" aria-expanded="false" aria-controls="menu">Menu</button>
@@ -24,4 +26,5 @@ dialog.drawer{margin:0 0 0 auto;height:100%;max-height:none;width:280px}
 
 <div class="tabs" role="tablist" id="tabs"><button role="tab" aria-selected="true" id="t1">Short</button><button role="tab" aria-selected="false" id="t2" style="width:160px">A wider tab</button><button role="tab" aria-selected="false" id="t3">Third one</button><span class="tab-indicator" id="ind"></span></div>
 <div class="tabs" role="tablist" id="rtl" dir="rtl"><button role="tab" aria-selected="true" id="r1">Short</button><button role="tab" aria-selected="false" id="r2" style="width:160px">Wide</button><span class="tab-indicator" id="rind"></span></div>
+<div id="ee" style="color:red"><span class="ee-item" id="e1">One</span><span class="ee-item" id="e2" style="margin:2px">Two</span></div>
 <script src="../.build/component-motion.js"></script></body></html>

@@ -1,4 +1,4 @@
-import { test, expect, style, prop } from "./fixture";
+import { test, expect, style, prop, declared, declarations as styleDeclarations } from "./fixture";
 
 // Recipe: animaxxing/references/recipes/component-motion.md
 
@@ -543,4 +543,188 @@ test("a disclosure pre-collapsed inline by the server opens to its content and s
     return { height: panel.getBoundingClientRect().height, style: panel.getAttribute("style") ?? "" };
   });
   expect(result).toEqual({ height: 80, style: "" });
+});
+
+/** Builds `enterExit` on #ee: items rise in on back.out, then tumble down with rotation on exit. */
+const buildEnterExit = (page: import("@playwright/test").Page, options: Record<string, unknown> = {}) =>
+  page.evaluate((opts) => {
+    const w = window as any;
+    const box = document.getElementById("ee")!;
+    const items = box.querySelectorAll(".ee-item");
+    w.log = [];
+    w.ee = w.CM.enterExit(
+      (tl: any) =>
+        tl
+          .fromTo(box, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.2, ease: "none" })
+          .fromTo(items, { y: 40 }, { y: 0, duration: 0.6, ease: "back.out(3)" }),
+      (tl: any) => tl.to(items, { y: 200, rotation: 30, duration: 0.5, ease: "power2.in" }).to(box, { autoAlpha: 0, duration: 0.1 }),
+      { ...opts, onOpen: () => w.log.push("open"), onClose: () => w.log.push("close") },
+    );
+  }, options);
+
+const eeState = (page: import("@playwright/test").Page) =>
+  page.evaluate(() => {
+    const w = window as any;
+    return {
+      phase: w.ee.phase(),
+      log: w.log.join(","),
+      y: Math.round(Number(w.gsap.getProperty("#e1", "y"))),
+      rotation: Math.round(Number(w.gsap.getProperty("#e1", "rotation"))),
+      visibility: getComputedStyle(document.getElementById("ee")!).visibility,
+    };
+  });
+
+test("enterExit plays a separate exit from the open rest and replays the entrance after", async ({ open }) => {
+  const page = await open("component-motion");
+  await buildEnterExit(page);
+  expect(await eeState(page)).toMatchObject({ phase: "closed", y: 40, visibility: "hidden" });
+
+  await freeze(page);
+  await page.evaluate(() => (window as any).ee.open());
+  await advance(page, 0.3);
+  expect(await eeState(page)).toMatchObject({ phase: "opening", visibility: "visible" });
+  await advance(page, 0.6);
+  expect(await eeState(page)).toMatchObject({ phase: "open", log: "open", y: 0, rotation: 0 });
+  // Resting at the pause: time passing does not start the exit.
+  await advance(page, 0.5);
+  expect(await eeState(page)).toMatchObject({ phase: "open", y: 0 });
+
+  await page.evaluate(() => (window as any).ee.close());
+  await advance(page, 0.3);
+  const exiting = await eeState(page);
+  // The exit is its own motion: items fall past the open rest and rotate, unlike the entrance in reverse.
+  expect(exiting.phase).toBe("closing");
+  expect(exiting.y).toBeGreaterThan(0);
+  expect(exiting.rotation).toBeGreaterThan(0);
+  await advance(page, 0.5);
+  // A finished exit rewinds to the entrance's closed start.
+  expect(await eeState(page)).toMatchObject({ phase: "closed", log: "open,close", y: 40, rotation: 0, visibility: "hidden" });
+
+  await page.evaluate(() => (window as any).ee.open());
+  await advance(page, 1);
+  expect(await eeState(page)).toMatchObject({ phase: "open", log: "open,close,open", y: 0 });
+  await release(page);
+
+  await page.evaluate(() => {
+    (window as any).ee.revert();
+    (window as any).ee.revert();
+  });
+  expect(await styleDeclarations(page, "#ee")).toEqual(await declared(page, "color:red"));
+  expect(await style(page, "#e1")).toBe("");
+  expect(await styleDeclarations(page, "#e2")).toEqual(await declared(page, "margin:2px"));
+});
+
+test("enterExit reverses an interrupted entrance and turns an interrupted exit back to open", async ({ open }) => {
+  const page = await open("component-motion");
+  await buildEnterExit(page, { reverseSpeed: 2 });
+  await freeze(page);
+  await page.evaluate(() => (window as any).ee.open());
+  await advance(page, 0.4);
+  await page.evaluate(() => (window as any).ee.close());
+  await advance(page, 0.05);
+  const turning = await eeState(page);
+  // Back the way it came, never into the exit's tumble.
+  expect(turning.phase).toBe("closing");
+  expect(turning.rotation).toBe(0);
+  await advance(page, 0.5);
+  expect(await eeState(page)).toMatchObject({ phase: "closed", log: "close", y: 40, visibility: "hidden" });
+
+  await page.evaluate(() => (window as any).ee.open());
+  await advance(page, 1);
+  await page.evaluate(() => (window as any).ee.close());
+  await advance(page, 0.3);
+  const exiting = await eeState(page);
+  expect(exiting.rotation).toBeGreaterThan(0);
+  await page.evaluate(() => (window as any).ee.open());
+  expect((await eeState(page)).phase).toBe("opening");
+  await advance(page, 0.4);
+  expect(await eeState(page)).toMatchObject({ phase: "open", log: "close,open,open", y: 0, rotation: 0, visibility: "visible" });
+  await release(page);
+  await page.evaluate(() => (window as any).ee.revert());
+});
+
+test("enterExit's reverseSpeed shortens a reversed entrance", async ({ open }) => {
+  const page = await open("component-motion");
+  // Real time: the held test clock does not realign a timeline whose timeScale changes as it reverses.
+  const reversal = (speed: number) =>
+    page.evaluate(async (reverseSpeed) => {
+      const w = window as any;
+      const box = document.getElementById("ee")!;
+      let started = 0;
+      let took = 0;
+      const closed = new Promise<void>((resolve) => {
+        w.ee = w.CM.enterExit(
+          (tl: any) => tl.fromTo(box, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.8, ease: "none" }),
+          (tl: any) => tl.to(box, { autoAlpha: 0, duration: 0.2 }),
+          { reverseSpeed, onClose: () => ((took = performance.now() - started), resolve()) },
+        );
+      });
+      w.ee.open();
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      started = performance.now();
+      w.ee.close();
+      await closed;
+      w.ee.revert();
+      return took;
+    }, speed);
+  const normal = await reversal(1);
+  const doubled = await reversal(2);
+  expect(doubled).toBeLessThan(normal * 0.75);
+});
+
+test("enterExit's easeReverse changes the curve of a reversed entrance", async ({ open }) => {
+  const page = await open("component-motion");
+  /** How far the items travel back in the first 0.1s after a close interrupts the entrance at 0.5s. */
+  const firstStep = async (options: Record<string, unknown>) => {
+    await buildEnterExit(page, { reverseSpeed: 1, ...options });
+    await freeze(page);
+    await page.evaluate(() => (window as any).ee.open());
+    await advance(page, 0.5);
+    const before = Number(await page.evaluate(() => (window as any).gsap.getProperty("#e1", "y")));
+    await page.evaluate(() => (window as any).ee.close());
+    await advance(page, 0.1);
+    const after = Number(await page.evaluate(() => (window as any).gsap.getProperty("#e1", "y")));
+    await release(page);
+    await page.evaluate(() => (window as any).ee.revert());
+    return Math.abs(after - before);
+  };
+  const mirrored = await firstStep({});
+  const eased = await firstStep({ easeReverse: "power3.in" });
+  // power3.in eases out of the turn; the mirrored back.out would snap back at once.
+  expect(mirrored).toBeGreaterThan(0.5);
+  expect(eased).toBeLessThan(mirrored / 2);
+});
+
+test("enterExit under reduced motion jumps between rests and still calls back", async ({ open }) => {
+  const page = await open("component-motion");
+  await page.evaluate(() => (document.documentElement.dataset.motion = "reduced"));
+  await buildEnterExit(page);
+  await page.evaluate(() => (window as any).ee.open());
+  expect(await eeState(page)).toMatchObject({ phase: "open", log: "open", y: 0, visibility: "visible" });
+  await page.evaluate(() => (window as any).ee.close());
+  expect(await eeState(page)).toMatchObject({ phase: "closed", log: "open,close", y: 40, rotation: 0, visibility: "hidden" });
+  await page.evaluate(() => (window as any).ee.revert());
+  expect(await styleDeclarations(page, "#ee")).toEqual(await declared(page, "color:red"));
+  expect(await style(page, "#e1")).toBe("");
+});
+
+test("an enterExit whose entrance throws rolls back and rethrows", async ({ open }) => {
+  const page = await open("component-motion");
+  const result = await page.evaluate(() => {
+    const w = window as any;
+    const box = document.getElementById("ee")!;
+    try {
+      w.CM.enterExit(
+        (tl: any) => {
+          tl.fromTo(box, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.2 });
+          throw new Error("entrance failed");
+        },
+        () => {},
+      );
+      return "no throw";
+    } catch (error) {
+      return `${(error as Error).message}|${box.style.cssText.replace(/\s|;/g, "")}|${!!w.gsap.context()}`;
+    }
+  });
+  expect(result).toBe("entrance failed|color:red|false");
 });
