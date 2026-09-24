@@ -1,0 +1,18 @@
+<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>
+body{margin:0;font:16px sans-serif}
+.loop-viewport{width:800px;overflow-x:auto;margin-top:40px}
+.loop-track{display:flex;width:max-content;gap:20px}
+.loop-track a{display:block;width:200px;height:120px;background:#ccc;flex:none}
+.grid-viewport{width:600px;height:400px;overflow:auto;margin-top:40px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,150px);gap:10px;list-style:none;margin:0;padding:0}
+.grid li{height:100px;background:#ddd}
+.grid a{display:block;height:100%}
+[data-drag-grid]{position:relative;height:100%;margin:0;padding:0}
+[data-drag-grid]>*{position:absolute;left:0;top:0;margin:0}
+.tall{height:2000px}
+</style></head><body>
+<a href="#top" id="before">Before</a>
+<div class="loop-viewport" id="lvp"><div class="loop-track" id="ltr"><a href="#i0" id="i0" style="color: rgb(1, 2, 3);">0 <span id="inner0">zero</span></a><a href="#i1" id="i1">1</a><a href="#i2" id="i2">2</a></div></div>
+<div class="grid-viewport" id="gvp"><ul class="grid" id="grid"><li id="g0"><a href="#t0" id="t0">T0</a></li><li id="g1"><a href="#t1" id="t1">T1</a></li><li id="g2"><a href="#t2" id="t2">T2</a></li></ul></div>
+<div class="tall"></div>
+<script src="../.build/endless-drag.js"></script></body></html>
