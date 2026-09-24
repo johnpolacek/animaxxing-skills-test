@@ -279,3 +279,122 @@ test("curtain drift under reduced motion never moves the content", async ({ open
   });
   expect(result).toEqual({ fired: 2, y: 0, style: "" });
 });
+
+/** Holds GSAP's clock so a cover can be sampled mid-sweep; `step` advances it by seconds. */
+const hold = (page: import("@playwright/test").Page) => page.evaluate(() => void (window as any).gsap.globalTimeline.pause());
+const step = (page: import("@playwright/test").Page, seconds: number) =>
+  page.evaluate((s) => {
+    const clock = (window as any).gsap.globalTimeline;
+    clock.time(clock.time() + s);
+  }, seconds);
+const d = (page: import("@playwright/test").Page) => page.$eval("#cpath", (el) => el.getAttribute("d") ?? "");
+/** Numbers in the path: M x y L x y Q cx cy x y L x y Z. */
+const nums = (path: string) => path.match(/-?\d+(\.\d+)?/g)!.map(Number);
+
+test("curve cover bows its edge ahead, covers and blocks clicks, reveals out the far edge, and restores", async ({ open }) => {
+  const page = await open("page-covers");
+  await page.evaluate(() => {
+    document.getElementById("pre")!.style.display = "none";
+    const w = window as any;
+    w.c = w.PC.curveCover(document.getElementById("curve"), { duration: 0.8, bend: 30 });
+    w.done = [];
+  });
+  expect(await page.$eval("#curve", (el) => getComputedStyle(el).visibility)).toBe("hidden");
+  expect(await d(page)).toBe("M0 100 L0 100 Q50 100 100 100 L100 100 Z");
+
+  await hold(page);
+  await page.evaluate(() => void (window as any).c.cover().eventCallback("onComplete", () => (window as any).done.push("cover")));
+  await step(page, 0.3);
+  const [, , , cornerY, , controlY] = nums(await d(page));
+  // From the bottom: the edge has risen, and its middle leads its corners upward.
+  expect(cornerY).toBeLessThan(100);
+  expect(controlY).toBeLessThan(cornerY!);
+  expect(await page.$eval("#curve", (el) => getComputedStyle(el).visibility)).toBe("visible");
+  await step(page, 0.6);
+  expect(await d(page)).toBe("M0 100 L0 0 Q50 0 100 0 L100 100 Z");
+  expect(await page.evaluate(() => (window as any).done)).toEqual(["cover"]);
+  // Covered: the page underneath takes no clicks.
+  expect(await page.evaluate(() => document.elementFromPoint(210, 210)?.closest("svg")?.id)).toBe("curve");
+
+  await page.evaluate(() => void (window as any).c.reveal().eventCallback("onComplete", () => (window as any).done.push("reveal")));
+  await step(page, 0.3);
+  const revealing = nums(await d(page));
+  // Now spanning the trailing edge to the top: it starts from the far edge, and the trailing edge has risen.
+  expect(revealing.slice(0, 2)).toEqual([0, 0]);
+  expect(revealing[3]).toBeLessThan(100);
+  await step(page, 0.6);
+  await page.evaluate(() => void (window as any).gsap.globalTimeline.resume());
+  expect(await page.evaluate(() => (window as any).done)).toEqual(["cover", "reveal"]);
+  expect(await page.$eval("#curve", (el) => getComputedStyle(el).visibility)).toBe("hidden");
+  expect(await page.$eval("#curve", (el) => getComputedStyle(el).pointerEvents)).toBe("none");
+  expect(await d(page)).toBe("M0 100 L0 100 Q50 100 100 100 L100 100 Z");
+
+  await page.evaluate(() => {
+    (window as any).c.revert();
+    (window as any).c.revert();
+  });
+  expect(await style(page, "#curve")).toBe("");
+  expect(await page.$eval("#cpath", (el) => el.hasAttribute("d"))).toBe(false);
+});
+
+test("a curve cover turns back mid-reveal and mid-cover, and follows its entry edge", async ({ open }) => {
+  const page = await open("page-covers");
+  await page.evaluate(() => ((window as any).c = (window as any).PC.curveCover(document.getElementById("curve"), { from: "left" })));
+  await hold(page);
+  await page.evaluate(() => void (window as any).c.cover());
+  await step(page, 1);
+  // From the left: the full shape, drawn along x.
+  expect(await d(page)).toBe("M0 0 L100 0 Q100 50 100 100 L0 100 Z");
+
+  await page.evaluate(() => void (window as any).c.reveal());
+  await step(page, 0.4);
+  const trailing = nums(await d(page))[2]!;
+  expect(trailing).toBeGreaterThan(0);
+  await page.evaluate(() => void (window as any).c.cover());
+  await step(page, 0.05);
+  // The trailing edge heads back toward the entry edge, never on to the far one.
+  expect(nums(await d(page))[2]).toBeLessThanOrEqual(trailing);
+  await step(page, 1);
+  expect(nums(await d(page))[2]).toBe(0);
+  expect(await page.$eval("#curve", (el) => getComputedStyle(el).visibility)).toBe("visible");
+
+  await page.evaluate(() => void (window as any).c.reveal());
+  await step(page, 1);
+  await page.evaluate(() => void (window as any).c.cover());
+  await step(page, 0.3);
+  const front = nums(await d(page))[2]!;
+  await page.evaluate(() => void (window as any).c.reveal());
+  await step(page, 0.05);
+  expect(nums(await d(page))[2]).toBeLessThanOrEqual(front);
+  await step(page, 1);
+  await page.evaluate(() => void (window as any).gsap.globalTimeline.resume());
+  expect(await page.$eval("#curve", (el) => getComputedStyle(el).visibility)).toBe("hidden");
+  await page.evaluate(() => (window as any).c.revert());
+  expect(await style(page, "#curve")).toBe("");
+});
+
+test("a curve cover under reduced motion never shows and still completes; a missing path throws clean", async ({ open }) => {
+  const page = await open("page-covers");
+  const result = await page.evaluate(async () => {
+    const w = window as any;
+    document.documentElement.dataset.motion = "reduced";
+    const svg = document.getElementById("curve")!;
+    const c = w.PC.curveCover(svg);
+    let seen = false;
+    const watch = new MutationObserver(() => (seen ||= getComputedStyle(svg).visibility === "visible"));
+    watch.observe(svg, { attributes: true });
+    const settle = (tl: any) => new Promise<void>((resolve) => tl.eventCallback("onComplete", resolve));
+    await settle(c.cover());
+    await settle(c.reveal());
+    watch.disconnect();
+    c.revert();
+    let thrown = "";
+    try {
+      w.PC.curveCover(document.getElementById("nopath"));
+    } catch (error) {
+      thrown = (error as Error).message;
+    }
+    return { seen, style: svg.getAttribute("style") ?? "", thrown, nopath: document.getElementById("nopath")!.getAttribute("style") };
+  });
+  expect(result).toEqual({ seen: false, style: "", thrown: "curveCover needs a <path> inside its <svg>", nopath: "position:fixed;width:0;height:0" });
+});

@@ -2,11 +2,14 @@
 body{margin:0;font:16px sans-serif}
 .curtain{position:fixed;inset:0;z-index:50;display:flex;pointer-events:none;color:#111}
 .curtain-panel{flex:1;background:currentColor}
+.curve-cover{position:fixed;inset:0;z-index:55;width:100%;height:100%;fill:#222;pointer-events:none;visibility:hidden}
 .preloader{position:fixed;inset:0;z-index:60;display:grid;place-items:center;background:#fff}
 .preloader-bar{position:absolute;left:0;bottom:0;width:100%;height:2px;background:#111;transform:scaleX(0);transform-origin:0 50%}
 </style></head><body>
 <main><button id="page-button" style="margin:200px">page</button></main>
 <div class="curtain" aria-hidden="true"><div class="curtain-panel"></div><div class="curtain-panel"></div><div class="curtain-panel"></div><p id="ctitle" data-curtain-title style="position:absolute;inset:0;margin:0;color:#fff;visibility:hidden">Old</p></div>
+<svg class="curve-cover" id="curve" aria-hidden="true" viewBox="0 0 100 100" preserveAspectRatio="none"><path id="cpath"/></svg>
+<svg id="nopath" viewBox="0 0 100 100" style="position:fixed;width:0;height:0"></svg>
 <div class="preloader" id="pre" role="progressbar" aria-label="Loading" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
   <span data-preloader-count>0</span><span class="preloader-bar" data-preloader-bar></span>
 </div>
