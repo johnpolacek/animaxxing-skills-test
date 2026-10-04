@@ -2,8 +2,8 @@ import { test, expect, style } from "./fixture";
 
 // Recipes: split-entrances.md, route-letters.md, speak-in.md, wave.md, blast-off.md
 
-const ENTRANCES = ["charsRiseIn", "charsSpringIn", "charsCascadeIn", "charsFlipIn", "charsScatterIn", "wordsSlideIn", "linesMaskIn", "linesEllipseIn", "linesHighlightIn", "scrambleIn"];
-const EXITS = ["charsFallOut", "charsCascadeOut", "charsFlipOut", "charsScatterOut", "wordsSlideOut", "linesMaskOut", "linesEllipseOut", "linesHighlightOut", "scrambleOut"];
+const ENTRANCES = ["charsImplodeIn", "charsRiseIn", "charsSpringIn", "charsCascadeIn", "charsFlipIn", "charsScatterIn", "wordsSlideIn", "linesMaskIn", "linesEllipseIn", "linesHighlightIn", "scrambleIn"];
+const EXITS = ["charsExplodeOut", "charsFallOut", "charsCascadeOut", "charsFlipOut", "charsScatterOut", "wordsSlideOut", "linesMaskOut", "linesEllipseOut", "linesHighlightOut", "scrambleOut"];
 
 for (const name of [...ENTRANCES, ...EXITS, "charsWeightWave"]) {
   test(`${name} completes and restores the heading's markup`, async ({ open }) => {
@@ -490,4 +490,31 @@ test("scramble noise keeps every character's kind, holds punctuation back, and r
   expect(result.frames.some((f) => f !== result.source && f.length === result.source.length)).toBe(true);
   expect(result.a).toBe(result.b);
   expect(result.end).toBe(result.source);
+});
+
+test("implode starts each character out along its line from the center, and explode sends it the same way", async ({ open }) => {
+  const page = await open("text");
+  const result = await page.evaluate(() => {
+    const { SE, gsap } = window as any;
+    const el = document.getElementById("h")!;
+    const box = el.getBoundingClientRect();
+    const cx = box.left + box.width / 2;
+    const tl = SE.charsImplodeIn(el);
+    tl.pause(0.001);
+    const chars = Array.from(el.querySelectorAll<HTMLElement>("div")).filter((c) => c.textContent!.trim());
+    const outward = chars.map((c) => {
+      const x = Number(gsap.getProperty(c, "x"));
+      const home = c.getBoundingClientRect();
+      // Remove the current offset to find where the character rests.
+      const restX = home.left + home.width / 2 - x;
+      return { side: Math.sign(restX - cx), x };
+    });
+    const far = outward.filter((o) => Math.abs(o.x) > 150).length;
+    const agree = outward.filter((o) => Math.abs(o.x) > 20 && o.side !== 0).every((o) => Math.sign(o.x) === o.side);
+    tl.progress(1);
+    return { far, total: chars.length, agree, text: el.textContent };
+  });
+  expect(result.far).toBeGreaterThan(result.total * 0.6);
+  expect(result.agree).toBe(true);
+  expect(result.text).toBe("Small idea. Big feeling.");
 });
