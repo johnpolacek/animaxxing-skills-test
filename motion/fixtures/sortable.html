@@ -1,0 +1,14 @@
+<!doctype html><html><head><style>
+body{margin:0;font:16px sans-serif}
+ul{list-style:none;margin:40px;padding:0;width:300px}
+li{display:flex;gap:10px;align-items:center;height:40px;margin:0 0 10px;background:#eee}
+[data-sortable-handle]{touch-action:none;width:40px;height:40px}
+</style></head><body>
+<p id="sort-help" hidden>Press Space to pick up, arrow keys to move, Space to drop, Escape to cancel.</p>
+<ul id="list" aria-label="Tasks">
+<li data-sortable-item id="a" style="color: rgb(1, 2, 3)"><button type="button" data-sortable-handle aria-describedby="sort-help" id="ha">Move</button><span data-sortable-name>Alpha</span></li>
+<li data-sortable-item id="b"><button type="button" data-sortable-handle aria-describedby="sort-help" id="hb">Move</button><span data-sortable-name>Bravo</span></li>
+<li data-sortable-item id="c"><button type="button" data-sortable-handle aria-describedby="sort-help" id="hc">Move</button><span data-sortable-name>Charlie</span></li>
+<li data-sortable-item id="d"><button type="button" data-sortable-handle aria-describedby="sort-help" id="hd">Move</button><span data-sortable-name>Delta</span></li>
+</ul>
+<script src="../.build/sortable.js"></script></body></html>

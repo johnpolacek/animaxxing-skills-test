@@ -63,6 +63,7 @@ const RECIPES = [
   "typewriter",
   "motion-vocabulary",
   "press-feedback",
+  "sortable",
   "webgl-stage",
   "image-planes",
   "uniform-effects",
@@ -109,6 +110,7 @@ const ENTRIES = {
   "endless-drag": `import * as ED from "./endless-drag"; import gsap from "gsap"; import { CustomEase } from "gsap/CustomEase"; gsap.registerPlugin(CustomEase); Object.assign(window, { ED, gsap, CustomEase });`,
   "physics-effects": `import * as PH from "./physics-effects"; import gsap from "gsap"; Object.assign(window, { PH, gsap });`,
   "press-feedback": `import * as PF from "./press-feedback"; import * as MV from "./motion-vocabulary"; import gsap from "gsap"; Object.assign(window, { PF, MV, gsap });`,
+  sortable: `import * as SO2 from "./sortable"; import gsap from "gsap"; Object.assign(window, { SR: SO2, gsap });`,
   vocabulary: `import * as MV from "./motion-vocabulary"; import gsap from "gsap"; Object.assign(window, { MV, gsap });`,
   typewriter: `import * as TW from "./typewriter"; import gsap from "gsap"; Object.assign(window, { TW, gsap });`,
   webgl: `import * as WS from "./webgl-stage"; import * as IP from "./image-planes"; import * as UE from "./uniform-effects"; import gsap from "gsap"; import { ScrollTrigger } from "gsap/ScrollTrigger"; Object.assign(window, { WS, IP, UE, gsap, ST: ScrollTrigger });`,
@@ -124,6 +126,7 @@ const ENTRY_RECIPES = {
   "physics-effects": ["physics-effects"],
   typewriter: ["typewriter"],
   vocabulary: ["motion-vocabulary"],
+  sortable: ["sortable"],
   "press-feedback": ["press-feedback", "motion-vocabulary"],
   webgl: ["webgl-stage", "image-planes", "uniform-effects"],
 };
