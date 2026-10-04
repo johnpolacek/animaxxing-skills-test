@@ -59,6 +59,7 @@ const RECIPES = [
   "sound-cues",
   "endless-drag",
   "physics-effects",
+  "typewriter",
   "webgl-stage",
   "image-planes",
   "uniform-effects",
@@ -101,6 +102,7 @@ const ENTRIES = {
   "sound-cues": `import * as SO from "./sound-cues"; import gsap from "gsap"; Object.assign(window, { SO, gsap });`,
   "endless-drag": `import * as ED from "./endless-drag"; import gsap from "gsap"; import { CustomEase } from "gsap/CustomEase"; gsap.registerPlugin(CustomEase); Object.assign(window, { ED, gsap, CustomEase });`,
   "physics-effects": `import * as PH from "./physics-effects"; import gsap from "gsap"; Object.assign(window, { PH, gsap });`,
+  typewriter: `import * as TW from "./typewriter"; import gsap from "gsap"; Object.assign(window, { TW, gsap });`,
   webgl: `import * as WS from "./webgl-stage"; import * as IP from "./image-planes"; import * as UE from "./uniform-effects"; import gsap from "gsap"; import { ScrollTrigger } from "gsap/ScrollTrigger"; Object.assign(window, { WS, IP, UE, gsap, ST: ScrollTrigger });`,
 };
 /** Entries whose recipes were built; the original five bundle several recipes each. */
@@ -112,6 +114,7 @@ const ENTRY_RECIPES = {
   "section-pager": ["section-pager"], "sound-cues": ["sound-cues"],
   "endless-drag": ["endless-drag"],
   "physics-effects": ["physics-effects"],
+  typewriter: ["typewriter"],
   webgl: ["webgl-stage", "image-planes", "uniform-effects"],
 };
 for (const [name, code] of Object.entries(ENTRIES)) {
