@@ -1,0 +1,18 @@
+<!doctype html><html><head><style>
+body{margin:0;font:20px sans-serif}
+.spacer{height:700px}
+[data-stack-card]{position:relative;height:300px;margin:0 40px 40px;background:#ddd;border:1px solid #333}
+.zoom{position:relative;height:100vh;overflow:clip;display:grid;place-items:center}
+.zoom>*{grid-area:1/1}
+.zoom-back{width:100%;height:100%;margin:0;background:#036}
+.zoom-front{font-size:80px;margin:0;background:none}
+#clipme{width:100%;height:100%;background:#630}
+</style></head><body>
+<div class="spacer"></div>
+<section id="deck"><article data-stack-card id="c0">one</article><article data-stack-card id="c1" style="color:rgb(1, 2, 3)">two</article><article data-stack-card id="c2">three</article></section>
+<div class="spacer"></div>
+<section class="zoom" id="zoom"><figure class="zoom-back" id="back"></figure><h2 class="zoom-front" id="front">m<span id="focus">o</span>ve</h2></section>
+<div class="spacer"></div>
+<section class="zoom" id="zoom2"><div id="clipme"></div></section>
+<div class="spacer" style="height:2000px"></div>
+<script src="../.build/scroll-effects.js"></script></body></html>
