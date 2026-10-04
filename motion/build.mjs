@@ -20,14 +20,15 @@ mkdirSync(src, { recursive: true });
  * module. Usage blocks (under "## Wiring" or starting "// Example") are skipped.
  */
 function extract(recipe) {
-  const markdown = readFileSync(path.join(recipeDir(SKILL_OF[recipe] ?? "animaxxing"), `${recipe}.md`), "utf8");
+  const file0 = PATH_OF[recipe] ? path.join(skillsRepo, PATH_OF[recipe]) : path.join(recipeDir(SKILL_OF[recipe] ?? "animaxxing"), `${recipe}.md`);
+  const markdown = readFileSync(file0, "utf8");
   const modules = new Map();
   let file = recipe;
   let skip = false;
   for (const section of markdown.split(/^(?=## )/m)) {
     const heading = section.match(/^## (.+)$/m)?.[1].trim() ?? "";
     if (/^[\w-]+\.ts$/.test(heading)) file = heading.slice(0, -3);
-    skip = heading === "Wiring";
+    skip = heading === "Wiring" || (SECTIONS_OF[recipe] && !SECTIONS_OF[recipe].includes(heading));
     if (skip) continue;
     for (const [, code] of section.matchAll(/^```ts\n([\s\S]*?)^```$/gm)) {
       if (code.trimStart().startsWith("// Example")) continue;
@@ -60,10 +61,15 @@ const RECIPES = [
   "endless-drag",
   "physics-effects",
   "typewriter",
+  "motion-vocabulary",
+  "press-feedback",
   "webgl-stage",
   "image-planes",
   "uniform-effects",
 ];
+/** References outside the recipes folder, and the "## " sections whose code they contribute. */
+const PATH_OF = { "motion-vocabulary": "skills/animaxxing/references/motion-vocabulary.md" };
+const SECTIONS_OF = { "motion-vocabulary": ["Tokens", "Accents"] };
 /** Recipes outside the core animaxxing skill. */
 const SKILL_OF = { "webgl-stage": "animaxxing-webgl", "image-planes": "animaxxing-webgl", "uniform-effects": "animaxxing-webgl" };
 /** MOTION_ONLY=recipe[,recipe] builds and type-checks just those, so parallel work on one recipe cannot break another's run. */
@@ -102,6 +108,8 @@ const ENTRIES = {
   "sound-cues": `import * as SO from "./sound-cues"; import gsap from "gsap"; Object.assign(window, { SO, gsap });`,
   "endless-drag": `import * as ED from "./endless-drag"; import gsap from "gsap"; import { CustomEase } from "gsap/CustomEase"; gsap.registerPlugin(CustomEase); Object.assign(window, { ED, gsap, CustomEase });`,
   "physics-effects": `import * as PH from "./physics-effects"; import gsap from "gsap"; Object.assign(window, { PH, gsap });`,
+  "press-feedback": `import * as PF from "./press-feedback"; import * as MV from "./motion-vocabulary"; import gsap from "gsap"; Object.assign(window, { PF, MV, gsap });`,
+  vocabulary: `import * as MV from "./motion-vocabulary"; import gsap from "gsap"; Object.assign(window, { MV, gsap });`,
   typewriter: `import * as TW from "./typewriter"; import gsap from "gsap"; Object.assign(window, { TW, gsap });`,
   webgl: `import * as WS from "./webgl-stage"; import * as IP from "./image-planes"; import * as UE from "./uniform-effects"; import gsap from "gsap"; import { ScrollTrigger } from "gsap/ScrollTrigger"; Object.assign(window, { WS, IP, UE, gsap, ST: ScrollTrigger });`,
 };
@@ -115,6 +123,8 @@ const ENTRY_RECIPES = {
   "endless-drag": ["endless-drag"],
   "physics-effects": ["physics-effects"],
   typewriter: ["typewriter"],
+  vocabulary: ["motion-vocabulary"],
+  "press-feedback": ["press-feedback", "motion-vocabulary"],
   webgl: ["webgl-stage", "image-planes", "uniform-effects"],
 };
 for (const [name, code] of Object.entries(ENTRIES)) {
