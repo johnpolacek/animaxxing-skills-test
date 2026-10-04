@@ -88,6 +88,17 @@ test("zoomThrough clip opens a window to full bleed and restores", async ({ open
   const clip = () => page.$eval("#clipme", (el) => (el as HTMLElement).style.clipPath);
   await scrollTo(page, zoomTop - 50);
   await expect.poll(clip).toMatch(/inset\(30%/);
+  // Midway, every side has moved in step: the window stays centered.
+  await scrollTo(page, zoomTop + 300);
+  await page.waitForTimeout(100);
+  // The browser shortens equal sides, as in "inset(15% 17% round 6px)": expand it like CSS does.
+  const values = (await clip()).match(/inset\(([^r)]*)/)![1]!.trim().split(/\s+/).map(parseFloat);
+  const [a, b = a, c = a, d = b] = values as [number, number?, number?, number?];
+  const sides = [a, b, c, d];
+  expect(sides[0]).toBeCloseTo(sides[2]!, 1);
+  expect(sides[1]).toBeCloseTo(sides[3]!, 1);
+  expect(sides[1]).toBeGreaterThan(0);
+  expect(sides[1]).toBeLessThan(34);
   await scrollTo(page, zoomTop + 800);
   await expect.poll(clip).toMatch(/inset\(0%/);
   await page.evaluate(() => (window as any).t());
