@@ -327,11 +327,19 @@ test.describe("touch", () => {
 
   test("vertical swipes over the loop and an x-capturing grid scroll the page", async ({ open, page }) => {
     await open("endless-drag");
+    const cdp = await page.context().newCDPSession(page);
+    // Control: the same swipe before any effect is built. Headless Chromium on Linux (CI) synthesizes the
+    // gesture without scrolling the page at all, so there the test has nothing to measure.
+    await cdp.send("Input.synthesizeScrollGesture", { x: 400, y: 100, yDistance: -300, gestureSourceType: "touch", speed: 800 });
+    await page.waitForTimeout(600);
+    const scrolls = await page.evaluate(() => window.scrollY > 100);
+    await page.evaluate(() => window.scrollTo(0, 0));
     await loop(page);
     await grid(page);
     expect(await page.$eval("#lvp", (el) => getComputedStyle(el).touchAction)).toContain("pan-y");
     expect(await page.$eval("#gvp", (el) => getComputedStyle(el).touchAction)).toContain("pan-y");
-    const cdp = await page.context().newCDPSession(page);
+    // The touch-action checks above run everywhere; the swipes need a browser that scrolls for them.
+    test.skip(!scrolls, "This browser does not scroll the page for a synthesized touch swipe, even with no effect built.");
     for (const [x, y] of [[400, 100], [300, 400]]) {
       await page.evaluate(() => window.scrollTo(0, 0));
       await cdp.send("Input.synthesizeScrollGesture", { x, y, yDistance: -300, gestureSourceType: "touch", speed: 800 });
