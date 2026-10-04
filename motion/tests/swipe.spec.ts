@@ -37,6 +37,23 @@ test("a short drag springs back; a long one dismisses, closes the gap, and repor
   expect(await page.$eval("#n2", (el) => el.getAttribute("style"))).toBeNull();
 });
 
+test("a fast drag that stops before release springs back instead of flicking", async ({ open }) => {
+  const page = await open("swipe");
+  await page.evaluate(() => {
+    (window as any).gone = [];
+    (window as any).s = (window as any).P.swipeDismiss(document.getElementById("n2"), { onDismiss: (el: HTMLElement) => (window as any).gone.push(el.id) });
+  });
+  await page.mouse.move(100, 125);
+  await page.mouse.down();
+  await page.mouse.move(180, 125, { steps: 2 });
+  // Held still well past the flick window, then released short of the threshold.
+  await page.waitForTimeout(250);
+  await page.mouse.up();
+  await expect.poll(() => x(page, "n2")).toBeCloseTo(0, 0);
+  expect(await page.evaluate(() => (window as any).gone)).toEqual([]);
+  await page.evaluate(() => (window as any).s.revert());
+});
+
 test("a quick flick dismisses even when short", async ({ open }) => {
   const page = await open("swipe");
   await page.evaluate(() => {
