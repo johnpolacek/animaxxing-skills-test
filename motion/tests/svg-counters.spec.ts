@@ -458,3 +458,65 @@ test("odometer continues from mid-roll when a new value arrives", async ({ open 
   expect(result.end).toBeCloseTo(8, 3);
   expect(result.text).toBe("98");
 });
+
+test("pathScrub slides text along its path with scroll, both ways, and restores its offset", async ({ open }) => {
+  const page = await open("svg-counters");
+  const offset = () => page.$eval("#tp", (el) => parseFloat(el.getAttribute("startOffset") ?? "0"));
+  await page.evaluate(() => ((window as any).ps = (window as any).V.pathScrub(document.getElementById("tp"), { scrub: true })));
+  // The svg sits below the fold: the text waits at 100%.
+  expect(await offset()).toBeCloseTo(100, 0);
+  await page.evaluate(() => window.scrollTo(0, document.getElementById("tp-svg")!.getBoundingClientRect().top + scrollY - 100));
+  await expect.poll(offset).toBeLessThan(5);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect.poll(offset).toBeGreaterThan(95);
+  await page.evaluate(() => {
+    (window as any).ps();
+    (window as any).ps();
+  });
+  expect(await page.$eval("#tp", (el) => el.getAttribute("startOffset"))).toBe("10%");
+});
+
+test("pathScrub under reduced motion places the text at rest and restores it", async ({ open }) => {
+  const page = await open("svg-counters");
+  const result = await page.evaluate(() => {
+    document.documentElement.dataset.motion = "reduced";
+    const el = document.getElementById("tp")!;
+    const revert = (window as any).V.pathScrub(el, { to: 0 });
+    const placed = el.getAttribute("startOffset");
+    revert();
+    return { placed, after: el.getAttribute("startOffset") };
+  });
+  expect(result).toEqual({ placed: "0%", after: "10%" });
+});
+
+test("pathLoop turns text one lap at a time, pauses on command and off screen, and restores", async ({ open }) => {
+  const page = await open("svg-counters");
+  const offset = () => page.$eval("#tpl", (el) => parseFloat(el.getAttribute("startOffset") ?? "0"));
+  await page.evaluate(() => ((window as any).pl = (window as any).V.pathLoop(document.getElementById("tpl"), { duration: 1 })));
+  const seen = await page.evaluate(async () => {
+    const values: number[] = [];
+    for (let i = 0; i < 30; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      values.push(parseFloat(document.getElementById("tpl")!.getAttribute("startOffset") ?? "0"));
+    }
+    return values;
+  });
+  expect(Math.min(...seen)).toBeGreaterThanOrEqual(0);
+  expect(Math.max(...seen)).toBeLessThanOrEqual(50);
+  expect(new Set(seen).size).toBeGreaterThan(5);
+  await page.evaluate(() => (window as any).pl.pause());
+  const held = await offset();
+  await page.waitForTimeout(200);
+  expect(await offset()).toBe(held);
+  await page.evaluate(() => (window as any).pl.play());
+  await page.evaluate(() => window.scrollTo(0, 2000));
+  await page.waitForTimeout(150);
+  const away = await offset();
+  await page.waitForTimeout(200);
+  expect(await offset()).toBe(away);
+  await page.evaluate(() => {
+    (window as any).pl.revert();
+    (window as any).pl.revert();
+  });
+  expect(await page.$eval("#tpl", (el) => el.getAttribute("startOffset"))).toBeNull();
+});
