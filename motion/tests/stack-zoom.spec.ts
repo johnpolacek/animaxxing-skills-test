@@ -93,3 +93,24 @@ test("zoomThrough clip opens a window to full bleed and restores", async ({ open
   await page.evaluate(() => (window as any).t());
   expect(await style(page, "#clipme")).toBe("");
 });
+
+test("zoomThrough measures its focus again after a layout change and refresh", async ({ open }) => {
+  const page = await open("stack-zoom");
+  await page.evaluate(() => ((window as any).t = (window as any).S.zoomThrough(document.getElementById("zoom"), document.getElementById("front"), { focus: document.getElementById("focus")!, scale: 20, length: 1, scrub: true })));
+  // A late font or layout change moves the focus inside the target.
+  await page.evaluate(() => {
+    document.getElementById("front")!.style.fontSize = "120px";
+    document.getElementById("front")!.style.paddingLeft = "200px";
+    (window as any).ST.refresh();
+  });
+  const zoomTop = await page.$eval("#zoom", (el) => el.getBoundingClientRect().top + scrollY);
+  await scrollTo(page, zoomTop);
+  await page.waitForTimeout(100);
+  const at1 = await page.$eval("#focus", (el) => { const r = el.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; });
+  await scrollTo(page, zoomTop + 300);
+  await expect.poll(() => scale(page, "front")).toBeGreaterThan(2);
+  const at2 = await page.$eval("#focus", (el) => { const r = el.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; });
+  expect(Math.abs(at2[0]! - at1[0]!)).toBeLessThan(4);
+  expect(Math.abs(at2[1]! - at1[1]!)).toBeLessThan(4);
+  await page.evaluate(() => (window as any).t());
+});
