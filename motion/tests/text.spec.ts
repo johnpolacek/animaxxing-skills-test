@@ -452,3 +452,42 @@ test("glitch shows and hides copies at most once each, under three flashes a sec
   });
   for (const [kind, most] of Object.entries(flips)) expect(most, kind).toBeLessThanOrEqual(2);
 });
+
+test("scramble noise keeps every character's kind, holds punctuation back, and replays the same frames", async ({ open }) => {
+  const page = await open("text");
+  const result = await page.evaluate(() => {
+    const { SE } = window as any;
+    const el = document.getElementById("h")!;
+    el.textContent = "Room 42, Hall B. Open!";
+    const source = el.textContent;
+    const tl = SE.scrambleIn(el);
+    tl.pause(0);
+    const frames: string[] = [];
+    for (let t = 0; t <= tl.duration(); t += 0.05) {
+      tl.seek(t, false);
+      frames.push(el.textContent!);
+    }
+    tl.seek(0.3, false);
+    const a = el.textContent;
+    tl.seek(0.6, false);
+    tl.seek(0.3, false);
+    const b = el.textContent;
+    tl.progress(1);
+    return { source, frames, a, b, end: el.textContent };
+  });
+  const bad = result.frames.flatMap((frame) =>
+    [...frame].filter((c, i) => {
+      const o = result.source[i]!;
+      if (/[A-Z]/.test(o)) return !/[A-Z]/.test(c);
+      if (/[a-z]/.test(o)) return !/[a-z]/.test(c);
+      if (/[0-9]/.test(o)) return !/[0-9]/.test(c);
+      return c !== o && c !== " ";
+    }),
+  );
+  expect(bad).toEqual([]);
+  // Punctuation is blank in noise and appears only once revealed.
+  expect(result.frames[2]![7]).toBe(" ");
+  expect(result.frames.some((f) => f !== result.source && f.length === result.source.length)).toBe(true);
+  expect(result.a).toBe(result.b);
+  expect(result.end).toBe(result.source);
+});

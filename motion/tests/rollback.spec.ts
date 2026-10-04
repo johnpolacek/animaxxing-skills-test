@@ -110,7 +110,14 @@ test("scrambleIn visibly scrambles, then lands on the real words", async ({ open
     return { mid, fired };
   });
   expect(result.mid).not.toBe(text);
-  expect(result.mid).toMatch(/[01{}/<>()=;]/);
+  // Noise keeps each character's kind: capitals for capitals, lowercase for lowercase, digits for digits.
+  expect([...result.mid!].every((c, i) => {
+    const o = text![i]!;
+    if (/[A-Z]/.test(o)) return /[A-Z]/.test(c);
+    if (/[a-z]/.test(o)) return /[a-z]/.test(c);
+    if (/[0-9]/.test(o)) return /[0-9]/.test(c);
+    return c === o || c === " ";
+  })).toBe(true);
   expect(result.fired).toBe(1);
   expect(await page.$eval("#h", (el) => el.textContent)).toBe(text);
   expect(warnings.filter((w) => /plugin|Invalid property/i.test(w))).toEqual([]);
