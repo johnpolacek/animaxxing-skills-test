@@ -342,3 +342,113 @@ for (const sample of [{ reduced: false, progress: 0.5 }, { reduced: false, progr
     expect(result.after).toEqual(result.before);
   });
 }
+
+const GLITCH_TYPES = ["slice", "blocks", "skew", "ghost", "weight", "scanline"];
+
+for (const type of GLITCH_TYPES) {
+  for (const runner of ["glitchIn", "glitchOut"]) {
+    test(`${runner} ${type} jumps, completes once, and restores the heading exactly`, async ({ open }) => {
+      const page = await open("text");
+      const original = await page.$eval("#gh", (el) => el.innerHTML);
+      const result = await page.evaluate(
+        async ([name, kind]) => {
+          const { SE, gsap } = window as any;
+          const el = document.getElementById("gh")!;
+          let fired = 0;
+          const tl = SE[name](el, { type: kind, onComplete: () => fired++ });
+          const copies = el.querySelectorAll('[aria-hidden="true"]').length;
+          const ids = el.querySelectorAll("#gem").length;
+          const source = Array.from(el.children).find((child) => (child as HTMLElement).style.opacity === "0");
+          // Largest offset seen on any moving part while it runs.
+          let peak = 0;
+          tl.eventCallback("onUpdate", () => {
+            const parts = [el, ...Array.from(el.querySelectorAll<HTMLElement>('[aria-hidden="true"], div, span'))];
+            for (const part of parts) peak = Math.max(peak, Math.abs(Number(gsap.getProperty(part, "x"))), Math.abs(Number(gsap.getProperty(part, "skewX"))));
+            const weights = Array.from(el.querySelectorAll<HTMLElement>("div")).map((c) => c.style.fontWeight);
+            if (new Set(weights).size > 1) peak = Math.max(peak, 1);
+          });
+          await new Promise((resolve) => setTimeout(resolve, tl.totalDuration() * 1000 + 300));
+          return { fired, copies, ids, hasSource: !!source, peak, progress: tl.progress() };
+        },
+        [runner, type],
+      );
+      expect(result.progress).toBe(1);
+      expect(result.fired).toBe(1);
+      expect(result.peak).toBeGreaterThan(0);
+      if (!["skew", "weight"].includes(type)) {
+        expect(result.copies).toBeGreaterThan(1);
+        expect(result.ids).toBe(1);
+        expect(result.hasSource).toBe(true);
+      }
+      expect(await page.$eval("#gh", (el) => el.innerHTML)).toBe(original);
+      const css = await page.$eval("#gh", (el) => ({ position: el.style.position, transform: el.style.transform, visibility: getComputedStyle(el).visibility, padding: el.style.padding }));
+      expect(css.position).toBe("");
+      expect(css.transform === "" || /translate\(0px, 0px\)|none/.test(css.transform)).toBe(true);
+      expect(css.padding).toBe("4px 10px");
+      expect(css.visibility).toBe(runner === "glitchOut" ? "hidden" : "visible");
+    });
+  }
+}
+
+test("glitch killed mid-run restores the heading through revertText", async ({ open }) => {
+  const page = await open("text");
+  const original = await page.$eval("#gh", (el) => el.innerHTML);
+  for (const type of GLITCH_TYPES) {
+    await page.evaluate((kind) => {
+      const { SE } = window as any;
+      const el = document.getElementById("gh")!;
+      const tl = SE.glitchIn(el, { type: kind });
+      tl.progress(0.4);
+      tl.kill();
+      SE.revertText(el);
+    }, type);
+    expect(await page.$eval("#gh", (el) => el.innerHTML), type).toBe(original);
+    expect(await page.$eval("#gh", (el) => el.style.position), type).toBe("");
+  }
+});
+
+test("glitch under reduced motion never layers or splits and still completes", async ({ open }) => {
+  const page = await open("text");
+  const result = await page.evaluate(async () => {
+    const { SE } = window as any;
+    document.documentElement.dataset.motion = "reduced";
+    const el = document.getElementById("gh")!;
+    let fired = 0;
+    SE.glitchIn(el, { type: "slice", onComplete: () => fired++ });
+    const children = el.children.length;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    return { fired, children };
+  });
+  expect(result).toEqual({ fired: 1, children: 1 });
+});
+
+test("glitch shows and hides copies at most once each, under three flashes a second", async ({ open }) => {
+  const page = await open("text");
+  const flips = await page.evaluate(() => {
+    const { SE, gsap } = window as any;
+    const el = document.getElementById("gh")!;
+    const counts: Record<string, number> = {};
+    for (const kind of ["slice", "blocks", "ghost", "scanline"]) {
+      const tl = SE.glitchIn(el, { type: kind });
+      tl.pause(0);
+      const layers = Array.from(el.querySelectorAll<HTMLElement>('[aria-hidden="true"]'));
+      const shown = () => layers.map((layer) => Number(gsap.getProperty(layer, "autoAlpha")) > 0);
+      let last = shown();
+      let most = 0;
+      const changes = layers.map(() => 0);
+      for (let t = 0; t <= tl.duration(); t += 1 / 60) {
+        tl.seek(t);
+        const now = shown();
+        now.forEach((on, i) => {
+          if (on !== last[i]) changes[i]!++;
+        });
+        last = now;
+      }
+      most = Math.max(...changes);
+      tl.progress(1);
+      counts[kind] = most;
+    }
+    return counts;
+  });
+  for (const [kind, most] of Object.entries(flips)) expect(most, kind).toBeLessThanOrEqual(2);
+});

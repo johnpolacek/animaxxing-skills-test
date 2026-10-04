@@ -438,3 +438,64 @@ test("default shaders use defined smoothstep edges and the lens changes rendered
   await expect.poll(() => pixelAt(page, 300, 165)).toEqual(before);
   await page.evaluate(() => (window as any).planes.a.revert());
 });
+
+test("the glitch starts hidden, jumps pixels while it runs, settles clean, and restores its uniforms", async ({ open, page }) => {
+  await openWebgl(open, page);
+  await page.evaluate(() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 256; canvas.height = 256;
+    const ctx = canvas.getContext("2d")!;
+    const gradient = ctx.createLinearGradient(0, 0, 256, 0);
+    gradient.addColorStop(0, "black"); gradient.addColorStop(1, "white");
+    ctx.fillStyle = gradient; ctx.fillRect(0, 0, 256, 256);
+    (document.getElementById("a") as HTMLImageElement).src = canvas.toDataURL();
+  });
+  await planes(page, ["a"]);
+  await page.evaluate(() => ((window as any).g = (window as any).UE.glitch((window as any).planes.a, { duration: 0.6 })));
+  expect(await uniform(page, "a", "uProgress")).toBe(0);
+  await page.evaluate(() => (window as any).g.enter().then(() => ((window as any).entered = true)));
+  await expect.poll(() => page.evaluate(() => (window as any).entered)).toBe(true);
+  expect(await uniform(page, "a", "uProgress")).toBe(1);
+  expect(await uniform(page, "a", "uGlitch")).toBe(0);
+  const rest = await pixelAt(page, 300, 165);
+  // Held at full strength, some bands jump: sampled rows differ from the clean frame at some tick.
+  const column = () => Promise.all(Array.from({ length: 14 }, (_, i) => pixelAt(page, 300, 100 + i * 12).then((p) => p[0]!)));
+  const clean = await column();
+  await page.evaluate(() => { (window as any).planes.a.uniforms.uGlitch.value = 1; });
+  await expect.poll(async () => {
+    const now = await column();
+    return now.filter((value, i) => Math.abs(value - clean[i]!) > 3).length;
+  }, { timeout: 6000 }).toBeGreaterThan(0);
+  await page.evaluate(() => { (window as any).planes.a.uniforms.uGlitch.value = 0; });
+  await expect.poll(() => pixelAt(page, 300, 165)).toEqual(rest);
+  await page.evaluate(() => {
+    (window as any).g.exit().then(() => ((window as any).gone = true));
+  });
+  await expect.poll(() => page.evaluate(() => (window as any).gone)).toBe(true);
+  expect(await uniform(page, "a", "uProgress")).toBe(0);
+  expect(await uniform(page, "a", "uGlitch")).toBe(0);
+  await page.evaluate(() => (window as any).g.revert());
+  expect(await uniform(page, "a", "uProgress")).toBe(1);
+  expect(await uniform(page, "a", "uGlitch")).toBe(0);
+  await page.evaluate(() => (window as any).planes.a.revert());
+});
+
+test("without WebGL the glitch's timelines finish at once with their callbacks", async ({ open, page }) => {
+  await openWebgl(open, page);
+  const result = await page.evaluate(async () => {
+    const w = window as any;
+    document.documentElement.dataset.motion = "reduced";
+    const plane = w.IP.imagePlane(document.getElementById("a"));
+    const g = w.UE.glitch(plane, { duration: 2 });
+    const start = performance.now();
+    const fired: string[] = [];
+    await new Promise<void>((resolve) => g.enter().eventCallback("onComplete", () => (fired.push("enter"), resolve())));
+    await new Promise<void>((resolve) => g.exit().eventCallback("onComplete", () => (fired.push("exit"), resolve())));
+    g.revert();
+    plane.revert();
+    return { fired, ms: performance.now() - start, canvas: !!document.querySelector("canvas[data-webgl-stage]") };
+  });
+  expect(result.fired).toEqual(["enter", "exit"]);
+  expect(result.ms).toBeLessThan(500);
+  expect(result.canvas).toBe(false);
+});
