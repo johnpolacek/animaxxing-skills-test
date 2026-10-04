@@ -342,3 +342,119 @@ test("n1 restores authored CSS priorities", async ({ open }) => {
   });
   expect(result.after).toEqual(result.before);
 });
+
+test("odometer rolls columns to a new value, reads it once, and restores the latest text", async ({ open }) => {
+  const page = await open("svg-counters");
+  const result = await page.evaluate(async () => {
+    const el = document.getElementById("od1")!;
+    const odo = (window as any).C.odometer(el, { duration: 0.3, stagger: 0 });
+    const built = { shown: el.querySelector('[aria-hidden="true"]')?.textContent?.length ?? 0, spoken: el.textContent?.endsWith("1,204") };
+    const roll = odo.set(1210);
+    let peak = 0;
+    roll.eventCallback("onUpdate", () => {
+      const strips = el.querySelectorAll<HTMLElement>('[aria-hidden="true"] span[style*="absolute"]');
+      peak = Math.max(peak, Math.abs(Number((window as any).gsap.getProperty(strips[strips.length - 1], "yPercent"))));
+    });
+    const spokenNow = Array.from(el.children).find((child) => !child.hasAttribute("aria-hidden"))?.textContent;
+    await new Promise((resolve) => roll.eventCallback("onComplete", resolve));
+    const sizers = Array.from(el.querySelectorAll<HTMLElement>('span[style*="visibility"]')).map((s) => s.textContent).join("");
+    odo.revert();
+    odo.revert();
+    return { built, spokenNow, peak, sizers, text: el.textContent, children: el.children.length, style: el.getAttribute("style") };
+  });
+  expect(result.built.spoken).toBe(true);
+  expect(result.spokenNow).toBe("1,210");
+  expect(result.peak).toBeGreaterThan(0);
+  expect(result.sizers).toBe("1210");
+  expect(result.text).toBe("1,210");
+  expect(result.children).toBe(0);
+  expect(result.style).toBe("color:red");
+});
+
+test("odometer rolls forward through 9 to 0 when rising and back when falling", async ({ open }) => {
+  const page = await open("svg-counters");
+  const ends = await page.evaluate(() => {
+    const el = document.getElementById("od2")!;
+    const odo = (window as any).C.odometer(el, { duration: 0.2, stagger: 0 });
+    const gsap = (window as any).gsap;
+    const ones = () => {
+      const strips = el.querySelectorAll<HTMLElement>('[aria-hidden="true"] span[style*="absolute"]');
+      return strips[strips.length - 1]!;
+    };
+    // 99 to 100: the shape changes, the ones column rolls 9 forward to the second 0.
+    const up = odo.set(100);
+    up.progress(0.999);
+    const rising = -Number(gsap.getProperty(ones(), "yPercent")) / 5;
+    up.progress(1);
+    const settled = -Number(gsap.getProperty(ones(), "yPercent")) / 5;
+    // 100 to 99: falling, the ones column runs down from the second set.
+    const down = odo.set(99);
+    down.progress(0.001);
+    const fallingStart = -Number(gsap.getProperty(ones(), "yPercent")) / 5;
+    down.progress(1);
+    const text = el.textContent;
+    odo.revert();
+    return { rising, settled, fallingStart, text, after: el.textContent };
+  });
+  expect(ends.rising).toBeGreaterThan(9.5);
+  expect(ends.settled).toBeCloseTo(0, 3);
+  expect(ends.fallingStart).toBeGreaterThan(9.5);
+  expect(ends.text?.endsWith("99")).toBe(true);
+  expect(ends.after).toBe("99");
+});
+
+test("odometer formats numbers like the first value and ignores a repeat", async ({ open }) => {
+  const page = await open("svg-counters");
+  const result = await page.evaluate(() => {
+    const el = document.getElementById("od3")!;
+    const odo = (window as any).C.odometer(el);
+    const roll = odo.set(12.5);
+    roll.progress(1);
+    const same = odo.set("$12.50");
+    odo.revert();
+    return { text: el.textContent, same: same === undefined };
+  });
+  expect(result).toEqual({ text: "$12.50", same: true });
+});
+
+test("odometer under reduced motion writes the value at once and builds nothing", async ({ open }) => {
+  const page = await open("svg-counters");
+  const result = await page.evaluate(() => {
+    document.documentElement.dataset.motion = "reduced";
+    const el = document.getElementById("od1")!;
+    const odo = (window as any).C.odometer(el);
+    const children = el.children.length;
+    const roll = odo.set(2000);
+    odo.revert();
+    return { children, roll: roll === undefined, text: el.textContent };
+  });
+  expect(result).toEqual({ children: 0, roll: true, text: "2,000" });
+});
+
+test("odometer continues from mid-roll when a new value arrives", async ({ open }) => {
+  const page = await open("svg-counters");
+  const result = await page.evaluate(() => {
+    const el = document.getElementById("od2")!;
+    const odo = (window as any).C.odometer(el, { duration: 1, stagger: 0 });
+    const gsap = (window as any).gsap;
+    const ones = () => {
+      const strips = el.querySelectorAll<HTMLElement>('[aria-hidden="true"] span[style*="absolute"]');
+      return -Number(gsap.getProperty(strips[strips.length - 1], "yPercent")) / 5;
+    };
+    // 99 to 93 falls; stop partway, then rise to 98 with the same shape.
+    const first = odo.set(93);
+    first.progress(0.5);
+    const mid = ones() % 10;
+    const second = odo.set(98);
+    const resumed = ones() % 10;
+    second.progress(1);
+    const end = ones();
+    odo.revert();
+    return { mid, resumed, end, text: el.textContent };
+  });
+  expect(result.mid).toBeGreaterThan(3);
+  expect(result.mid).toBeLessThan(9);
+  expect(Math.abs(result.resumed - result.mid)).toBeLessThan(0.01);
+  expect(result.end).toBeCloseTo(8, 3);
+  expect(result.text).toBe("98");
+});
