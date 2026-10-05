@@ -22,6 +22,36 @@ test("reveals items above and in view on a mid-page load, hides the rest", async
   expect(await page.evaluate(() => (window as any).ST.getAll().length)).toBe(0);
 });
 
+test("with repeat, scrolling back up hides an item again and scrolling down reveals it again", async ({ open }) => {
+  const page = await open("scroll-effects");
+  const opacity = () => page.$eval("#r2", (el) => Number(getComputedStyle(el).opacity));
+  await page.evaluate(() => ((window as any).t = (window as any).S.revealOnScroll(".rv", { repeat: true, duration: 0.2 })));
+  const below = await page.$eval("#r2", (el) => el.getBoundingClientRect().top + scrollY);
+  await page.evaluate((y) => window.scrollTo(0, y - 300), below);
+  await expect.poll(opacity).toBe(1);
+  // Back above the start line: it leaves.
+  await page.evaluate((y) => window.scrollTo(0, y - 900), below);
+  await expect.poll(opacity).toBe(0);
+  // And arrives again.
+  await page.evaluate((y) => window.scrollTo(0, y - 300), below);
+  await expect.poll(opacity).toBe(1);
+  await page.evaluate(() => (window as any).t());
+  for (const id of ["#r0", "#r1", "#r2"]) expect(await style(page, id)).toBe("");
+});
+
+test("without repeat, a revealed item stays revealed after scrolling back up", async ({ open }) => {
+  const page = await open("scroll-effects");
+  const opacity = () => page.$eval("#r2", (el) => Number(getComputedStyle(el).opacity));
+  await page.evaluate(() => ((window as any).t = (window as any).S.revealOnScroll(".rv", { duration: 0.2 })));
+  const below = await page.$eval("#r2", (el) => el.getBoundingClientRect().top + scrollY);
+  await page.evaluate((y) => window.scrollTo(0, y - 300), below);
+  await expect.poll(opacity).toBe(1);
+  await page.evaluate((y) => window.scrollTo(0, y - 900), below);
+  await page.waitForTimeout(400);
+  expect(await opacity()).toBe(1);
+  await page.evaluate(() => (window as any).t());
+});
+
 test("a waiting reveal stays in the accessibility tree and shows at once when focused", async ({ open }) => {
   const page = await open("scroll-effects");
   await page.evaluate(() => {
