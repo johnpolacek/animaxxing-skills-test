@@ -207,6 +207,50 @@ test("dialog opens with a fading backdrop, exits before closing, and keeps nativ
   expect(await style(page, "#dlg")).toBe("");
 });
 
+test("a dialog with from opens as a circle out of the trigger, rests unclipped, and closes back into it", async ({ open }) => {
+  const page = await open("component-motion");
+  await page.evaluate(() => {
+    const trigger = document.getElementById("open-dialog")!;
+    (window as any).d = (window as any).CM.dialogMotion(document.getElementById("dlg"), { from: trigger, duration: 0.3 });
+    trigger.addEventListener("click", () => (window as any).d.open());
+  });
+  await page.focus("#open-dialog");
+  const early = await page.evaluate(async () => {
+    const el = document.getElementById("dlg") as HTMLDialogElement;
+    document.getElementById("open-dialog")!.click();
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    const d = el.getBoundingClientRect();
+    const b = document.getElementById("open-dialog")!.getBoundingClientRect();
+    const m = getComputedStyle(el).clipPath.match(/circle\(([\d.]+)px at ([-\d.]+)px ([-\d.]+)px\)/);
+    return { open: el.open, r: m ? +m[1]! : -1, x: m ? +m[2]! + d.left : NaN, y: m ? +m[3]! + d.top : NaN, bx: b.left + b.width / 2, by: b.top + b.height / 2, reach: Math.hypot(d.width, d.height) };
+  });
+  expect(early.open).toBe(true);
+  // A small circle, centered on the trigger.
+  expect(early.r).toBeGreaterThan(0);
+  expect(early.r).toBeLessThan(early.reach / 2);
+  expect(Math.abs(early.x - early.bx)).toBeLessThan(1);
+  expect(Math.abs(early.y - early.by)).toBeLessThan(1);
+  await page.waitForTimeout(800);
+  expect(await page.$eval("#dlg", (el) => [getComputedStyle(el).clipPath, getComputedStyle(el).opacity, getComputedStyle(el, "::backdrop").opacity])).toEqual(["none", "1", "1"]);
+
+  const closed = await page.evaluate(async () => {
+    const dialog = document.getElementById("dlg") as HTMLDialogElement;
+    (window as any).d.close("ok");
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    const during = { open: dialog.open, clip: getComputedStyle(dialog).clipPath };
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    return { during, open: dialog.open, value: dialog.returnValue, focus: document.activeElement?.id, style: dialog.getAttribute("style") ?? "" };
+  });
+  expect(closed.during.open).toBe(true);
+  expect(closed.during.clip).toMatch(/^circle/);
+  expect(closed.open).toBe(false);
+  expect(closed.value).toBe("ok");
+  expect(closed.focus).toBe("open-dialog");
+  expect(closed.style).toBe("");
+  await page.evaluate(() => (window as any).d.revert());
+  expect(await style(page, "#dlg")).toBe("");
+});
+
 test("Escape runs the dialog's exit instead of the instant close", async ({ open }) => {
   const page = await open("component-motion");
   await page.evaluate(() => {
