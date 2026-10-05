@@ -275,6 +275,69 @@ test("scrollDirection flips past the threshold, marks the start, and restores", 
   expect(await read()).toEqual([undefined, undefined]);
 });
 
+test("headerShrink scrubs the header to a slim bar with transforms only, reverses, and restores", async ({ open }) => {
+  const page = await open("scroll-effects");
+  await page.evaluate(() => {
+    const h = document.createElement("header");
+    h.id = "tall";
+    h.style.cssText = "position:fixed;top:0;left:0;right:0;height:140px;display:flex;align-items:center;justify-content:space-between;pointer-events:none;z-index:6";
+    h.innerHTML = '<i data-header-bg style="position:absolute;inset:0;z-index:-1;background:#fff;transform-origin:50% 0"></i><a data-header-mark style="transform-origin:0 50%">Mark</a><nav data-header-nav>Nav</nav>';
+    document.body.prepend(h);
+    (window as any).t = (window as any).S.headerShrink(h, { compact: 56, distance: 160, mark: 0.5 });
+  });
+  const read = () =>
+    page.evaluate(() => {
+      const { gsap } = window as any;
+      const q = (s: string) => document.querySelector(`#tall ${s}`);
+      return { bg: +gsap.getProperty(q("[data-header-bg]"), "scaleY").toFixed(2), mark: +gsap.getProperty(q("[data-header-mark]"), "scale").toFixed(2), y: Math.round(+gsap.getProperty(q("[data-header-nav]"), "y")), box: document.getElementById("tall")!.offsetHeight };
+    });
+  expect(await read()).toEqual({ bg: 1, mark: 1, y: 0, box: 140 });
+  await page.evaluate(() => window.scrollTo(0, 80));
+  await expect.poll(async () => (await read()).bg).toBe(0.7);
+  await page.evaluate(() => window.scrollTo(0, 600));
+  // 56 / 140 tall; contents rise from the middle of 140 to the middle of 56. The box itself never changes.
+  await expect.poll(read).toEqual({ bg: 0.4, mark: 0.5, y: -42, box: 140 });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect.poll(async () => (await read()).bg).toBe(1);
+  await page.evaluate(() => (window as any).t());
+  // Moved properties are gone; the authored ones stay.
+  expect(
+    await page.evaluate(() =>
+      Array.from(document.querySelectorAll<HTMLElement>("#tall > *")).map((el) => [el.style.transform, el.style.translate, el.style.scale, el.style.fontStretch, el.style.transformOrigin]),
+    ),
+  ).toEqual([
+    ["", "", "", "", "50% 0px"],
+    ["", "", "", "", "0px 50%"],
+    ["", "", "", "", ""],
+  ]);
+  expect(await page.evaluate(() => (window as any).ST.getAll().length)).toBe(0);
+});
+
+test("headerSection rolls the label to the section under the header, both ways, and restores", async ({ open }) => {
+  const page = await open("scroll-effects");
+  await page.evaluate(() => {
+    document.getElementById("top")!.dataset.headerSection = "Intro";
+    document.getElementById("stmt")!.dataset.headerSection = "Work";
+    const label = document.createElement("span");
+    label.id = "lbl";
+    label.style.cssText = "display:inline-grid;overflow:clip";
+    label.textContent = "Intro";
+    document.getElementById("hdr")!.append(label);
+    (window as any).t = (window as any).S.headerSection(label, { line: 60, duration: 0.3 });
+  });
+  const text = () => page.$eval("#lbl", (el) => Array.from(el.children).map((c) => c.textContent).join("|"));
+  expect(await text()).toBe("Intro");
+  await page.evaluate(() => window.scrollTo(0, document.getElementById("stmt")!.offsetTop));
+  // Mid-roll, both names share the cell; then only the new one stays.
+  await expect.poll(text).toBe("Intro|Work");
+  await expect.poll(text).toBe("Work");
+  await page.evaluate(() => window.scrollTo(0, document.getElementById("top")!.offsetTop + 10));
+  await expect.poll(text).toBe("Intro");
+  await page.evaluate(() => (window as any).t());
+  expect(await page.$eval("#lbl", (el) => el.innerHTML)).toBe("Intro");
+  expect(await page.evaluate(() => (window as any).ST.getAll().length)).toBe(0);
+});
+
 test("runDrift slides marked items through the run and restores them before the run reverts", async ({ open }) => {
   const page = await open("scroll-effects");
   const original = await declarations(page, "#dr");
