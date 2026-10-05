@@ -499,3 +499,71 @@ test("without WebGL the glitch's timelines finish at once with their callbacks",
   expect(result.ms).toBeLessThan(500);
   expect(result.canvas).toBe(false);
 });
+
+for (const effect of ["dissolve", "pixelate", "ripple"] as const) {
+  test(`${effect} starts hidden, changes pixels mid-run, settles on the clean image, and restores its uniforms`, async ({ open, page }) => {
+    await openWebgl(open, page);
+    await page.evaluate(() => {
+      // A two-axis gradient, so any sampling change shows in the pixels.
+      const canvas = document.createElement("canvas");
+      canvas.width = 256; canvas.height = 256;
+      const ctx = canvas.getContext("2d")!;
+      for (let x = 0; x < 256; x += 8) for (let y = 0; y < 256; y += 8) {
+        ctx.fillStyle = `rgb(${x}, ${y}, ${(x + y) % 256})`;
+        ctx.fillRect(x, y, 8, 8);
+      }
+      (document.getElementById("a") as HTMLImageElement).src = canvas.toDataURL();
+    });
+    await planes(page, ["a"]);
+    const names = { dissolve: ["uDissolve"], pixelate: ["uPixelate", "uProgress"], ripple: ["uRipple", "uProgress"] }[effect];
+    const before = await Promise.all(names.map((n) => uniform(page, "a", n)));
+    await page.evaluate((e) => ((window as any).fx = (window as any).UE[e]((window as any).planes.a, { duration: 2 })), effect);
+    // Hidden at build: no ink at the sample point.
+    await expect.poll(async () => (await pixelAt(page, 240, 165))[3]).toBe(0);
+    // Early enough that each effect is strong: coarse blocks, the ring near the center, half dissolved.
+    const early = { dissolve: 0.35, pixelate: 0.02, ripple: 0.08 }[effect];
+    await page.evaluate((p) => {
+      const tl = (window as any).fx.enter();
+      tl.pause();
+      tl.progress(p);
+    }, early);
+    const column = () => Promise.all(Array.from({ length: 8 }, (_, i) => pixelAt(page, 120 + i * 37, 165)));
+    const mid = await column();
+    await page.evaluate(() => {
+      const w = window as any;
+      w.gsap.globalTimeline.getChildren(true, false, true).forEach((t: any) => t.progress(1));
+    });
+    await expect.poll(async () => JSON.stringify(await column())).not.toBe(JSON.stringify(mid));
+    const done = await column();
+    // At rest every sample shows ink.
+    expect(done.every((p) => p[3] === 255)).toBe(true);
+    expect(await uniform(page, "a", names[0]!)).toBe(effect === "dissolve" ? 1 : 0);
+    await page.evaluate(() => {
+      const tl = (window as any).fx.exit();
+      tl.progress(1);
+    });
+    await expect.poll(async () => (await pixelAt(page, 240, 165))[3]).toBe(0);
+    await page.evaluate(() => (window as any).fx.revert());
+    expect(await Promise.all(names.map((n) => uniform(page, "a", n)))).toEqual(before);
+    await page.evaluate(() => (window as any).planes.a.revert());
+  });
+}
+
+test("without WebGL the dissolve, pixelate, and ripple timelines finish at once", async ({ open, page }) => {
+  await openWebgl(open, page);
+  const ms = await page.evaluate(async () => {
+    const w = window as any;
+    document.documentElement.dataset.motion = "reduced";
+    const plane = w.IP.imagePlane(document.getElementById("a"));
+    const start = performance.now();
+    for (const name of ["dissolve", "pixelate", "ripple"]) {
+      const fx = w.UE[name](plane, { duration: 3 });
+      await new Promise<void>((resolve) => fx.enter().eventCallback("onComplete", resolve));
+      await new Promise<void>((resolve) => fx.exit().eventCallback("onComplete", resolve));
+      fx.revert();
+    }
+    plane.revert();
+    return performance.now() - start;
+  });
+  expect(ms).toBeLessThan(800);
+});
