@@ -100,8 +100,20 @@ test("pile drops pieces that collide, come to rest on the floor inside the box, 
     w.pile.drop(24);
   });
   expect(await page.$eval("#box", (el) => el.children.length)).toBe(24);
-  // Settled: every piece inside the box, the lowest on the floor, and no two sunk into each other.
-  await page.waitForTimeout(4000);
+  // Settled, waited for rather than timed, since a loaded machine steps slower than real time: nothing moves
+  // between two looks a third of a second apart.
+  const snapshot = () => page.$$eval("#box > *", (els) => els.map((el) => el.getAttribute("style")).join("|"));
+  await expect
+    .poll(
+      async () => {
+        const before = await snapshot();
+        await page.waitForTimeout(300);
+        return before === (await snapshot());
+      },
+      { timeout: 15000, intervals: [500] },
+    )
+    .toBe(true);
+  // Every piece inside the box, the lowest on the floor, and no two sunk into each other.
   const state = await page.evaluate(() => {
     const box = document.getElementById("box")!.getBoundingClientRect();
     const c = Array.from(document.querySelectorAll("#box > *")).map((el) => {
@@ -115,12 +127,6 @@ test("pile drops pieces that collide, come to rest on the floor inside the box, 
   expect(state.inside).toBe(true);
   expect(state.floor).toBeGreaterThan(283);
   expect(state.worst).toBeLessThan(4);
-  // At rest, nothing drifts.
-  const before = await page.$$eval("#box > *", (els) => els.map((el) => el.getAttribute("style")));
-  await page.waitForTimeout(300);
-  const after = await page.$$eval("#box > *", (els) => els.map((el) => el.getAttribute("style")));
-  const moved = before.filter((s, i) => s !== after[i]).length;
-  expect(moved).toBeLessThan(6);
   await page.evaluate(() => {
     (window as any).pile.stop();
     (window as any).pile.stop();
