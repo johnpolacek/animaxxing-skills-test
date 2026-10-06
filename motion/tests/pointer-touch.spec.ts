@@ -34,7 +34,10 @@ test("magnetic with touch follows a held finger, settles on lift, claims the tou
   await f.down(box.x + box.width / 2, box.y + box.height / 2);
   await f.move(box.x + box.width - 2, box.y + box.height / 2);
   await page.waitForTimeout(600);
-  expect(await prop(page, "#mag", "x")).toBeGreaterThan(2);
+  // Measured from the target's own center at the press: a short lean, not a jump across the page.
+  const leaned = await prop(page, "#mag", "x");
+  expect(leaned).toBeGreaterThan(2);
+  expect(leaned).toBeLessThan(box.width * 0.3);
   await f.up();
   await page.waitForTimeout(900);
   expect(Math.abs(await prop(page, "#mag", "x"))).toBeLessThan(0.5);
@@ -103,4 +106,25 @@ test("cursor follower with a touch area shows under a held finger and hides on l
   await page.waitForTimeout(100);
   expect(await page.$eval("#cur", (el) => getComputedStyle(el).visibility)).toBe("hidden");
   await page.evaluate(() => (window as any).t());
+});
+
+test("hover preview with touch shows the pressed row at once, follows the finger down the list, and hides on lift", async ({ open }) => {
+  const page = await open("media-effects");
+  await page.evaluate(() => ((window as any).t = (window as any).ME.hoverPreview(document.getElementById("list"), document.getElementById("pv"), { touch: true })));
+  const one = (await page.locator("#l1").boundingBox())!;
+  const three = (await page.locator("#l3").boundingBox())!;
+  const f = await finger(page);
+  // No move yet: the press alone shows the row under it.
+  await f.down(one.x + 10, one.y + one.height / 2);
+  await page.waitForTimeout(500);
+  expect(await page.$eval("#pv", (el) => getComputedStyle(el).visibility)).toBe("visible");
+  expect(Math.abs((await prop(page, "#pv", "x")) - (one.x + 10 + 24))).toBeLessThan(2);
+  await f.path([[one.x + 10, (one.y + three.y) / 2], [one.x + 10, three.y + three.height / 2]]);
+  await page.waitForTimeout(500);
+  expect(await page.$eval("#pv", (el) => getComputedStyle(el).visibility)).toBe("visible");
+  await f.up();
+  await page.waitForTimeout(500);
+  expect(await page.$eval("#pv", (el) => getComputedStyle(el).visibility)).toBe("hidden");
+  await page.evaluate(() => (window as any).t());
+  expect(await page.$eval("#list", (el) => (el as HTMLElement).style.touchAction)).toBe("");
 });

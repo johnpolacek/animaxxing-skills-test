@@ -62,7 +62,8 @@ test("a throwing tilt setup rolls back and rethrows", async ({ open }) => {
       return `${(error as Error).message}|${card.getAttribute("style")}|${!!(window as any).gsap.context()}`;
     }
   });
-  expect(result).toBe("boom|transform: translateZ(0px);|false");
+  // The card keeps its own transform, whether setup threw before writing or restored after.
+  expect(result).toMatch(/^boom\|transform: translateZ\(0(px)?\);?\|false$/);
 });
 
 test("cursor follower trails the mouse, grows over targets, and restores", async ({ open }) => {
