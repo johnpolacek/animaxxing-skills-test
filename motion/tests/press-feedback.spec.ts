@@ -54,7 +54,8 @@ test("Enter presses from the center and a held touch that scrolls springs back",
 test("pressFeedback keeps a positioned, clipped control's own styles and removes ripples in flight", async ({ open }) => {
   const page = await open("press-feedback");
   await page.evaluate(() => ((window as any).t = (window as any).PF.pressFeedback(document.getElementById("rel"))));
-  expect(await style(page, "#rel")).toBe("");
+  // Only the tap highlight is turned off: the ripple is the touch response.
+  expect(await declarations(page, "#rel")).toEqual(await declared(page, "-webkit-tap-highlight-color: transparent"));
   await page.mouse.move(400, 70);
   await page.mouse.down();
   expect(await page.locator("#rel [data-ripple]").count()).toBe(1);
