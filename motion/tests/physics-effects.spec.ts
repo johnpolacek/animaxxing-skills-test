@@ -84,3 +84,60 @@ test("reduced motion spawns nothing and resolves at once", async ({ open }) => {
   });
   expect(result).toBe(0);
 });
+
+test("pile drops pieces that collide, come to rest on the floor inside the box, and stop removes them", async ({ open }) => {
+  const page = await open("physics-effects");
+  await page.evaluate(() => {
+    const box = document.createElement("div");
+    box.id = "box";
+    box.style.cssText = "position:relative;overflow:hidden;width:400px;height:300px";
+    document.body.append(box);
+    const style = document.createElement("style");
+    style.textContent = "#box>*{position:absolute;left:0;top:0;display:block;width:30px;height:30px;border-radius:50%;background:#000;font-size:0}";
+    document.head.append(style);
+    const w = window as any;
+    w.pile = w.PH.pile(box, { pieces: ["•"] });
+    w.pile.drop(24);
+  });
+  expect(await page.$eval("#box", (el) => el.children.length)).toBe(24);
+  // Settled: every piece inside the box, the lowest on the floor, and no two sunk into each other.
+  await page.waitForTimeout(4000);
+  const state = await page.evaluate(() => {
+    const box = document.getElementById("box")!.getBoundingClientRect();
+    const c = Array.from(document.querySelectorAll("#box > *")).map((el) => {
+      const r = el.getBoundingClientRect();
+      return { x: r.left + r.width / 2 - box.left, y: r.top + r.height / 2 - box.top };
+    });
+    let worst = 0;
+    for (let i = 0; i < c.length; i++) for (let j = i + 1; j < c.length; j++) worst = Math.max(worst, 30 - Math.hypot(c[i]!.x - c[j]!.x, c[i]!.y - c[j]!.y));
+    return { inside: c.every((p) => p.x >= 14 && p.x <= 386 && p.y >= -400 && p.y <= 286), floor: Math.max(...c.map((p) => p.y)), worst };
+  });
+  expect(state.inside).toBe(true);
+  expect(state.floor).toBeGreaterThan(283);
+  expect(state.worst).toBeLessThan(4);
+  // At rest, nothing drifts.
+  const before = await page.$$eval("#box > *", (els) => els.map((el) => el.getAttribute("style")));
+  await page.waitForTimeout(300);
+  const after = await page.$$eval("#box > *", (els) => els.map((el) => el.getAttribute("style")));
+  const moved = before.filter((s, i) => s !== after[i]).length;
+  expect(moved).toBeLessThan(6);
+  await page.evaluate(() => {
+    (window as any).pile.stop();
+    (window as any).pile.stop();
+  });
+  expect(await page.$eval("#box", (el) => el.children.length)).toBe(0);
+});
+
+test("pile under reduced motion drops nothing", async ({ open }) => {
+  const page = await open("physics-effects");
+  const n = await page.evaluate(() => {
+    document.documentElement.dataset.motion = "reduced";
+    const box = document.createElement("div");
+    document.body.append(box);
+    const p = (window as any).PH.pile(box, { pieces: ["•"] });
+    p.drop(10);
+    p.stop();
+    return box.children.length;
+  });
+  expect(n).toBe(0);
+});
