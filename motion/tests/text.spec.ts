@@ -2,8 +2,8 @@ import { test, expect, style } from "./fixture";
 
 // Recipes: split-entrances.md, route-letters.md, speak-in.md, wave.md, blast-off.md
 
-const ENTRANCES = ["charsImplodeIn", "charsRiseIn", "charsSpringIn", "charsCascadeIn", "charsFlipIn", "charsScatterIn", "wordsSlideIn", "charsSlideIn", "linesMaskIn", "linesEllipseIn", "linesHighlightIn", "scrambleIn"];
-const EXITS = ["charsExplodeOut", "charsFallOut", "charsCascadeOut", "charsFlipOut", "charsScatterOut", "wordsSlideOut", "charsSlideOut", "linesMaskOut", "linesEllipseOut", "linesHighlightOut", "scrambleOut"];
+const ENTRANCES = ["charsImplodeIn", "charsRiseIn", "charsSpringIn", "charsCascadeIn", "charsFlipIn", "charsScatterIn", "wordsSlideIn", "charsSlideIn", "linesMaskIn", "linesSlideIn", "linesWipeIn", "linesIrisIn", "linesEllipseIn", "linesHighlightIn", "scrambleIn"];
+const EXITS = ["charsExplodeOut", "charsFallOut", "charsCascadeOut", "charsFlipOut", "charsScatterOut", "wordsSlideOut", "charsSlideOut", "linesMaskOut", "linesSlideOut", "linesWipeOut", "linesIrisOut", "linesEllipseOut", "linesHighlightOut", "scrambleOut"];
 
 for (const name of [...ENTRANCES, ...EXITS, "charsWeightWave"]) {
   test(`${name} completes and restores the heading's markup`, async ({ open }) => {
@@ -231,7 +231,7 @@ test("blast-off clears the hero, and its revert restores headline and container"
   for (const id of ["#hero", "#hh", "#go", "#other"]) expect(await style(page, id), id).toBe("");
 });
 
-test("linesEllipseIn clips each line mask with an ellipse that opens as the line rises", async ({ open }) => {
+test("linesEllipseIn opens each line mask through an arch from its bottom middle while the line lifts a little", async ({ open }) => {
   const page = await open("text");
   const original = await page.$eval("#hl", (el) => el.innerHTML);
   const samples = await page.evaluate(async () => {
@@ -255,7 +255,8 @@ test("linesEllipseIn clips each line mask with an ellipse that opens as the line
     return { start, mid };
   });
   expect(samples.start.clip).toMatch(/^ellipse\(/);
-  expect(samples.start.y).toBeGreaterThan(30);
+  expect(samples.start.y).toBeGreaterThan(10);
+  expect(samples.start.y).toBeLessThanOrEqual(15);
   expect(samples.mid.y).toBeLessThan(samples.start.y);
   expect(samples.mid.clip).not.toBe(samples.start.clip);
   expect(await page.$eval("#hl", (el) => el.innerHTML)).toBe(original);
