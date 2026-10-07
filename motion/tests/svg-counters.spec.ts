@@ -50,6 +50,44 @@ test("morph toggle changes shape, restores the original d, and is inert after re
   expect(await d()).toBe(original);
 });
 
+test("morph sequence flows through each shape, ends on its own with loop, and restores d on revert", async ({ open }) => {
+  const page = await open("svg-counters");
+  const d = () => page.$eval("#menu", (el) => el.getAttribute("d"));
+  const original = await d();
+  const stops = await page.evaluate(() => {
+    const w = window as any;
+    w.seq = w.V.morphSequence(document.getElementById("menu"), ["M6 6l12 12M18 6L6 18", "M12 5v14M5 12h14"], { duration: 0.5, hold: 0.25 });
+    const tl = w.seq.timeline;
+    const out = [tl.paused(), tl.duration()];
+    const at = (t: number) => (tl.seek(t), document.getElementById("menu")!.getAttribute("d"));
+    out.push(at(0.5), at(1.25), at(tl.duration()));
+    return out;
+  });
+  expect(stops[0]).toBe(true);
+  // Three morphs and three rests: two shapes, then back to its own.
+  expect(stops[1]).toBeCloseTo(0.5 * 3 + 0.25 * 3, 5);
+  expect(stops[2]).not.toBe(original);
+  expect(stops[3]).not.toBe(stops[2]);
+  expect(stops[4]).not.toBe(stops[3]);
+  await page.evaluate(() => (window as any).seq.revert());
+  expect(await d()).toBe(original);
+});
+
+test("morph sequence under reduced motion keeps the authored shape", async ({ open, page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await open("svg-counters");
+  const result = await page.evaluate(() => {
+    const w = window as any;
+    const seq = w.V.morphSequence(document.getElementById("menu"), ["M6 6l12 12M18 6L6 18"]);
+    const duration = seq.timeline.duration();
+    seq.timeline.progress(1);
+    const d = document.getElementById("menu")!.getAttribute("d");
+    seq.revert();
+    return [duration, d];
+  });
+  expect(result).toEqual([0, "M4 7h16M4 12h16M4 17h16"]);
+});
+
 test("path follower moves along the path and restores its transform", async ({ open }) => {
   const page = await open("svg-counters");
   await page.evaluate(() => {
