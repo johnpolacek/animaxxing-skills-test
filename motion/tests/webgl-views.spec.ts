@@ -132,7 +132,7 @@ test("a flight draws in its element's box, hides its poster, and frees everythin
   expect(await opacity(page, "#flight img")).toBe("0");
   await expect(page.getByRole("img", { name: "Posters receding down a tunnel" })).toBeVisible();
   // The nearest card hangs right of center: red, premultiplied.
-  await expect.poll(async () => (await pixelAt(page, 330, 165))[0]).toBeGreaterThan(120);
+  await expect.poll(async () => (await pixelAt(page, 400, 165))[0]).toBeGreaterThan(120);
   const start = await row(page, 165);
   await page.evaluate(() => ((window as any).ride.uniforms.uTravel.value = 0.5));
   await expect.poll(async () => differs(await row(page, 165), start)).toBeGreaterThan(3);
@@ -193,14 +193,17 @@ test("a morph gathers its points into the next shape, scatters, parts around the
   await openViews(open, page);
   expect(await build.morph(page)).toBe(true);
   expect(await opacity(page, "#morph img")).toBe("0");
-  // Scattered dust is spread thin; gathered into the sphere, the middle fills with points in the element's color.
+  // Each shape fits the element by its own bounds: wide dust reaches the element's left side, the round sphere
+  // gathers in the middle, in the element's color.
+  const side = () => ink(page, 48, 430, 110, 480);
   const middle = () => ink(page, 180, 395, 300, 515);
-  const dust = await middle();
+  expect((await side()).n).toBeGreaterThan(0);
   await page.evaluate(() => {
     (window as any).morph.to(1, { duration: 0 });
   });
-  await expect.poll(async () => (await middle()).n).toBeGreaterThan(dust.n * 1.5);
+  await expect.poll(async () => (await side()).n).toBe(0);
   const sphere = await middle();
+  expect(sphere.n).toBeGreaterThan(200);
   expect(sphere.blue).toBeGreaterThan(sphere.red + 60);
   // Nothing drawn outside the element's box.
   expect((await ink(page, 445, 330, 520, 580)).n).toBe(0);
@@ -236,9 +239,33 @@ test("a liquid image bends under a mouse trail, settles back to the clean image,
   const clean = await row(page, y);
   expect(new Set(clean).size).toBeGreaterThan(1);
 
-  await page.mouse.move(40, y);
-  await page.mouse.move(440, y + 30, { steps: 12 });
-  await expect.poll(async () => differs(await row(page, y), clean)).toBeGreaterThan(2);
+  // Drive the mouse inside the page, one step per drawn frame, and read the row on the frame after the last
+  // step: round trips from the test would let the trail fade on a loaded software renderer.
+  const stirred = await page.evaluate((y) => new Promise<number[]>((resolve) => {
+    const w = window as any;
+    const image = document.getElementById("liquid")!;
+    const at = (type: string, x: number) =>
+      image.dispatchEvent(new PointerEvent(type, { pointerType: "mouse", clientX: x, clientY: y, bubbles: type !== "pointerenter" }));
+    let x = 60;
+    at("pointerenter", x);
+    const step = () => {
+      // Brisk steps: on a loaded renderer each frame spans more time, so short steps read as a slow drag.
+      x += 60;
+      if (x <= 420) return at("pointermove", x);
+      w.gsap.ticker.remove(step);
+      const canvas = document.querySelector<HTMLCanvasElement>("canvas[data-webgl-stage]")!;
+      const gl = (canvas.getContext("webgl2") ?? canvas.getContext("webgl"))!;
+      const scale = canvas.width / innerWidth;
+      const px = new Uint8Array(canvas.width * 4);
+      gl.readPixels(0, Math.floor((innerHeight - y) * canvas.height / innerHeight), canvas.width, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      const out: number[] = [];
+      for (let sx = 48; sx < 440; sx += 13) out.push(px[Math.floor(sx * scale) * 4]!);
+      at("pointerleave", x);
+      resolve(out);
+    };
+    w.gsap.ticker.add(step);
+  }), y);
+  expect(differs(stirred, clean)).toBeGreaterThan(2);
   await page.mouse.move(700, 650);
   await expect.poll(async () => differs(await row(page, y), clean), { timeout: 8000 }).toBe(0);
 
