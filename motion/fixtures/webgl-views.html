@@ -9,6 +9,11 @@ body{margin:0;font:16px sans-serif}
 #column{position:absolute;left:460px;top:400px;width:40px;height:1400px;color:rgb(255,180,0)}
 #rows{position:absolute;left:510px;top:400px;margin:0;padding:0;list-style:none}
 #rows li{height:140px}
+#clipbox{position:absolute;left:500px;top:40px;width:200px;height:250px;pointer-events:none}
+#win{position:absolute;left:950px;top:40px;width:220px;height:300px;overflow:auto}
+#wcol{position:absolute;left:0;top:0;width:40px;height:900px;color:rgb(255,180,0)}
+#wrows{margin:0 0 0 50px;padding:0;list-style:none;height:900px}
+#wrows li{height:90px}
 </style></head><body>
 <div class="view" id="flight"><img data-poster alt="Posters receding down a tunnel"></div>
 <div class="view" id="morph"><img data-poster alt="Dust gathered into a word"></div>
@@ -16,6 +21,8 @@ body{margin:0;font:16px sans-serif}
 <div id="track"></div>
 <div id="melt"><h2>Hi</h2></div>
 <div id="column" aria-hidden="true"></div>
+<div id="clipbox"></div>
+<div id="win"><div id="wcol" aria-hidden="true"></div><ol id="wrows"><li>A</li><li>B</li><li>C</li><li>D</li><li>E</li><li>F</li><li>G</li><li>H</li><li>I</li><li>J</li></ol></div>
 <ol id="rows"><li>One</li><li>Two</li><li>Three</li><li>Four</li><li>Five</li><li>Six</li><li>Seven</li><li>Eight</li><li>Nine</li><li>Ten</li></ol>
 <script>
 // Same-origin pixels: data URLs never taint a canvas.

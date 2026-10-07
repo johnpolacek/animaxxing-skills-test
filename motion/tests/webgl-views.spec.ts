@@ -423,3 +423,42 @@ test("a stream pours down its column as the page scrolls and climbs back when th
   expect(await canvases(page)).toBe(0);
   await balanced(page);
 });
+
+test("a clip box keeps a view's drawing inside it", async ({ open, page }) => {
+  await openViews(open, page);
+  expect(await page.evaluate(() => {
+    const w = window as any;
+    const host = document.getElementById("melt")!;
+    w.metal = w.MB.melt(host, { draw: w.MB.drawText("Hi", "700 160px sans-serif"), poster: host.querySelector("h2"), drops: 10, clip: document.getElementById("clipbox") });
+    return w.metal.view.ready;
+  })).toBe(true);
+  await page.evaluate(() => new Promise<void>((resolve) => {
+    (window as any).metal.form({ duration: 0.3 }).eventCallback("onComplete", () => resolve());
+  }));
+  // The clip box covers the melt's left half: ink there, none past its right edge.
+  await expect.poll(async () => (await ink(page, 560, 80, 700, 250)).n).toBeGreaterThan(500);
+  expect((await ink(page, 704, 80, 840, 250)).n).toBe(0);
+  await page.evaluate(() => (window as any).metal.revert());
+  await balanced(page);
+});
+
+test("a stream in a scrolling box follows that box and stays inside it", async ({ open, page }) => {
+  await openViews(open, page);
+  await page.evaluate(() => {
+    const w = window as any;
+    const win = document.getElementById("win")!;
+    w.stream = w.MB.pourStream(document.getElementById("wcol"), { rows: Array.from(win.querySelectorAll("li")) as HTMLElement[], scroller: win });
+  });
+  await expect.poll(() => page.evaluate(() => (window as any).stream.view.live())).toBe(true);
+  // The page never scrolls, so only the box can move the head.
+  const inside = () => ink(page, 950, 40, 990, 340);
+  await expect.poll(async () => (await inside()).n).toBeGreaterThan(300);
+  const shallow = (await inside()).n;
+  await page.evaluate(() => document.getElementById("win")!.scrollTo(0, 400));
+  await expect.poll(async () => (await inside()).n).toBeGreaterThan(shallow + 300);
+  // The column runs on below the box, but nothing draws there.
+  expect((await ink(page, 950, 344, 990, 700)).n).toBe(0);
+  await page.evaluate(() => (window as any).stream.revert());
+  expect(await canvases(page)).toBe(0);
+  await balanced(page);
+});
