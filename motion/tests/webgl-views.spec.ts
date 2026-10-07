@@ -462,3 +462,20 @@ test("a stream in a scrolling box follows that box and stays inside it", async (
   expect(await canvases(page)).toBe(0);
   await balanced(page);
 });
+
+test("a melt formed from the top hangs drops on the top edge first, then falls into the shape", async ({ open, page }) => {
+  await openViews(open, page);
+  expect(await build.melt(page)).toBe(true);
+  await page.evaluate(() => {
+    const w = window as any;
+    w.falling = w.metal.form({ duration: 2, from: "top" });
+    w.falling.pause(0.55);
+  });
+  // Hanging: metal along the element's top edge, none yet where the word will sit.
+  await expect.poll(async () => (await ink(page, 520, 40, 880, 70)).n).toBeGreaterThan(200);
+  expect((await ink(page, 560, 150, 840, 250)).n).toBeLessThan(50);
+  await page.evaluate(() => (window as any).falling.progress(1));
+  await expect.poll(async () => (await ink(page, 560, 80, 840, 250)).n).toBeGreaterThan(2000);
+  await page.evaluate(() => (window as any).metal.revert());
+  await balanced(page);
+});
