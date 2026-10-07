@@ -1,0 +1,30 @@
+<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>
+body{margin:0;font:16px sans-serif}
+.view{position:relative;width:400px;height:250px;margin:40px;color:rgb(0,200,255)}
+.view img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+#liquid{display:block;width:400px;height:250px;object-fit:cover;margin:40px}
+#track{height:2000px}
+</style></head><body>
+<div class="view" id="flight"><img data-poster alt="Posters receding down a tunnel"></div>
+<div class="view" id="morph"><img data-poster alt="Dust gathered into a word"></div>
+<img id="liquid" alt="Striped field">
+<div id="track"></div>
+<script>
+// Same-origin pixels: data URLs never taint a canvas.
+const paint = (fill, w = 64, h = 48) => {
+  const c = document.createElement("canvas");
+  c.width = w; c.height = h;
+  const x = c.getContext("2d");
+  fill(x, w, h);
+  return c.toDataURL();
+};
+const solid = (color) => paint((x, w, h) => { x.fillStyle = color; x.fillRect(0, 0, w, h); });
+window.cards = ["#c33", "#3c3", "#33c", "#cc3", "#c3c", "#3cc"].map(solid);
+document.querySelector("#flight img").src = solid("#222");
+document.querySelector("#morph img").src = solid("#111");
+// Vertical stripes: any sideways bend changes sampled pixels.
+document.getElementById("liquid").src = paint((x, w, h) => {
+  for (let i = 0; i < w; i += 8) { x.fillStyle = (i / 8) % 2 ? "#fff" : "#000"; x.fillRect(i, 0, 8, h); }
+}, 256, 160);
+</script>
+<script src="../.build/webgl-views.js"></script></body></html>
