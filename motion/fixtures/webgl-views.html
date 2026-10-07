@@ -4,11 +4,19 @@ body{margin:0;font:16px sans-serif}
 .view img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 #liquid{display:block;width:400px;height:250px;object-fit:cover;margin:40px}
 #track{height:2000px}
+#melt{position:absolute;left:500px;top:40px;width:400px;height:250px;color:rgb(0,200,255)}
+#melt h2{margin:0;font:700 120px sans-serif;text-align:center;line-height:250px}
+#column{position:absolute;left:460px;top:400px;width:40px;height:1400px;color:rgb(255,180,0)}
+#rows{position:absolute;left:510px;top:400px;margin:0;padding:0;list-style:none}
+#rows li{height:140px}
 </style></head><body>
 <div class="view" id="flight"><img data-poster alt="Posters receding down a tunnel"></div>
 <div class="view" id="morph"><img data-poster alt="Dust gathered into a word"></div>
 <img id="liquid" alt="Striped field">
 <div id="track"></div>
+<div id="melt"><h2>Hi</h2></div>
+<div id="column" aria-hidden="true"></div>
+<ol id="rows"><li>One</li><li>Two</li><li>Three</li><li>Four</li><li>Five</li><li>Six</li><li>Seven</li><li>Eight</li><li>Nine</li><li>Ten</li></ol>
 <script>
 // Same-origin pixels: data URLs never taint a canvas.
 const paint = (fill, w = 64, h = 48) => {

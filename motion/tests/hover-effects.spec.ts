@@ -314,3 +314,68 @@ test("link2 restores authored CSS priorities", async ({ open }) => {
   });
   expect(result.after).toEqual(result.before);
 });
+
+
+const xform = (page: Page, selector: string, name: string) => page.evaluate(([s, n]) => Number((window as any).gsap.getProperty(s, n)), [selector, name] as const);
+
+test("beadUnderline lands a bead where the mouse enters, stretches it into the line, and drains out at the exit", async ({ open }) => {
+  const page = await open("hover-effects");
+  await page.evaluate(() => ((window as any).off = (window as any).HE.beadUnderline(document.getElementById("bead"))));
+  const line = "#bead > span[aria-hidden]";
+  const b = await page.$eval("#bead", (el) => { const r = el.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; });
+  await page.mouse.move(b.x + b.w * 0.7, b.y - 30);
+  await page.mouse.move(b.x + b.w * 0.7, b.y + b.h / 2);
+  // At first a bead sits near the entry point, much narrower than the link.
+  await page.waitForTimeout(60);
+  expect(await xform(page, line, "scaleX")).toBeLessThan(0.6);
+  expect(await xform(page, line, "x")).toBeGreaterThan(b.w * 0.3);
+  // Then it spreads into the whole underline, thinned to its thickness.
+  await expect.poll(() => xform(page, line, "scaleX")).toBeCloseTo(1, 2);
+  await expect.poll(() => xform(page, line, "scaleY")).toBeCloseTo(1 / 6, 2);
+  await page.mouse.move(b.x + 2, b.y + b.h / 2);
+  await leave(page);
+  await expect.poll(() => xform(page, line, "scaleX")).toBe(0);
+  await page.evaluate(() => (window as any).off());
+  expect(await page.$(line)).toBeNull();
+  expect(await style(page, "#bead")).toBe("");
+});
+
+test("pourFill pours in from the side the mouse crossed, marks the control, and drains out", async ({ open }) => {
+  const page = await open("hover-effects");
+  await page.evaluate(() => ((window as any).off = (window as any).HE.pourFill(document.getElementById("round"), document.getElementById("round-fill"))));
+  expect(await xform(page, "#round-fill", "scale")).toBe(0);
+  // Enter from the left edge: the liquid starts left of the middle.
+  await page.mouse.move(250, 630);
+  await page.mouse.move(302, 630);
+  await page.waitForTimeout(40);
+  expect(await xform(page, "#round-fill", "xPercent")).toBeLessThan(-20);
+  await expect.poll(() => xform(page, "#round-fill", "scaleX")).toBeCloseTo(1, 2);
+  expect(await page.$eval("#round", (el) => el.hasAttribute("data-poured"))).toBe(true);
+  await leave(page);
+  await expect.poll(() => xform(page, "#round-fill", "scale")).toBe(0);
+  expect(await page.$eval("#round", (el) => el.hasAttribute("data-poured"))).toBe(false);
+  // Keyboard focus pours from the middle.
+  await page.focus("#round");
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Tab");
+  await expect.poll(() => page.$eval("#round", (el) => el.hasAttribute("data-poured"))).toBe(true);
+  await page.evaluate(() => (window as any).off());
+  expect(await style(page, "#round-fill")).toBe("");
+  expect(await page.$eval("#round", (el) => el.hasAttribute("data-poured"))).toBe(false);
+});
+
+test("jelly squashes on arrival and springs back, its highlight follows the mouse, and it restores the button", async ({ open }) => {
+  const page = await open("hover-effects");
+  const before = await style(page, "#jelly");
+  await page.evaluate(() => ((window as any).off = (window as any).HE.jelly(document.getElementById("jelly"))));
+  const b = await page.$eval("#jelly", (el) => { const r = el.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; });
+  await page.mouse.move(b.x + 10, b.y + b.h / 2);
+  await page.waitForTimeout(120);
+  expect(await xform(page, "#jelly", "scaleY")).toBeLessThan(0.97);
+  await expect.poll(() => xform(page, "#jelly", "scaleY")).toBeCloseTo(1, 2);
+  await page.mouse.move(b.x + b.w - 10, b.y + b.h / 2, { steps: 4 });
+  await expect.poll(() => xform(page, "#jelly > span[aria-hidden]", "x")).toBeGreaterThan(b.w / 2 - 60);
+  await page.evaluate(() => (window as any).off());
+  expect(await page.$("#jelly > span[aria-hidden]")).toBeNull();
+  expect(await style(page, "#jelly")).toBe(before);
+});

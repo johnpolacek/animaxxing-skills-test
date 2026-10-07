@@ -366,3 +366,38 @@ test("f1 restores authored CSS priorities", async ({ open }) => {
   });
   expect(result.after).toEqual(result.before);
 });
+
+test("pourReveal spreads a blob from its origin, scales the inside to rest, clears at rest, and drains with out", async ({ open }) => {
+  const page = await open("media-effects");
+  const before = await style(page, "#f2");
+  const run = await page.evaluate(() => {
+    const w = window as any;
+    const frame = document.getElementById("f2")!;
+    w.p = w.ME.pourReveal(frame, { origin: [1, 1], duration: 0.6 });
+    w.p.timeline.pause(0);
+    const start = frame.style.clipPath;
+    w.p.timeline.seek(0.3);
+    const mid = frame.style.clipPath;
+    const scale = Number(w.gsap.getProperty("#i2", "scale"));
+    w.p.timeline.progress(1);
+    return { start, mid, scale, end: frame.style.clipPath };
+  });
+  // At the start every point sits on the origin, the frame's bottom right corner.
+  const box = await page.$eval("#f2", (el) => { const r = el.getBoundingClientRect(); return [r.width, r.height]; });
+  expect(run.start).toContain(`${box[0]}px ${box[1]}px`);
+  expect((run.mid.match(/px/g) ?? []).length).toBe(96);
+  expect(run.mid).not.toBe(run.start);
+  expect(run.scale).toBeGreaterThan(1);
+  expect(run.scale).toBeLessThan(1.08);
+  expect(run.end).toBe("");
+  expect(await style(page, "#f2")).toBe(before);
+  const drained = await page.evaluate(() => {
+    const w = window as any;
+    w.d = w.ME.pourReveal(document.getElementById("f2"), { out: true, duration: 0.3 });
+    w.d.timeline.progress(1);
+    return document.getElementById("f2")!.style.clipPath;
+  });
+  expect(drained).toMatch(/^polygon/);
+  await page.evaluate(() => (window as any).d.revert());
+  expect(await style(page, "#f2")).toBe(before);
+});

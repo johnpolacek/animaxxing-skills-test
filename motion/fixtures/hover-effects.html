@@ -9,6 +9,10 @@ body{margin:0;font:16px sans-serif;height:1400px}
 #frame{display:block;width:240px;height:160px;overflow:hidden}
 #frame2{display:block;width:240px;height:160px}
 #img,#img2{display:block;width:240px;height:160px;background:#8ab}
+#bead{position:absolute;left:100px;top:600px;font-size:20px;color:#036}
+#round{position:absolute;left:300px;top:600px;width:60px;height:60px;border-radius:50%;overflow:hidden;isolation:isolate;color:#036;display:grid;place-items:center}
+#round-fill{position:absolute;inset:0;z-index:-1;border-radius:50%;background:currentColor}
+#jelly{position:absolute;left:450px;top:600px;padding:14px 28px;border:0;border-radius:999px;background:#036;color:#fff;font:18px sans-serif}
 </style></head><body>
 <button id="roll" type="button">Start <em id="em">now</em></button>
 <button id="roll2" type="button"><svg width="16" height="16" aria-hidden="true"><circle cx="8" cy="8" r="8"/></svg><span data-roll-label id="lbl">Play</span></button>
@@ -16,4 +20,7 @@ body{margin:0;font:16px sans-serif;height:1400px}
 <p id="para" style="position:absolute;left:400px;top:200px;font-size:20px">Read the <a id="link2" href="#r">notes</a></p>
 <article class="card" id="card"><a id="cardlink" href="#c"><span id="frame"><img id="img" alt="One" src="data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACwAAAAAAQABAAACAkQBADs="></span><h3>One</h3></a></article>
 <article class="card" id="card2"><a href="#d"><div id="frame2"><div id="img2" data-zoom-image></div></div><h3>Two</h3></a></article>
+<a id="bead" href="#b">Bead</a>
+<a id="round" href="#n" aria-label="Next"><span id="round-fill" aria-hidden="true"></span>→</a>
+<button id="jelly" type="button">Explore</button>
 <script src="../.build/hover-effects.js"></script></body></html>

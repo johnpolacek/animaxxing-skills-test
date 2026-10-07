@@ -72,13 +72,14 @@ const RECIPES = [
   "scene-flight",
   "particle-morph",
   "liquid-image",
+  "metaballs",
 ];
 /** References outside the recipes folder, and the "## " sections whose code they contribute. */
 const PATH_OF = { "motion-vocabulary": "skills/animaxxing/references/motion-vocabulary.md" };
 const SECTIONS_OF = { "motion-vocabulary": ["Tokens", "Accents"] };
 /** Recipes outside the core animaxxing skill. */
 const SKILL_OF = Object.fromEntries(
-  ["webgl-stage", "image-planes", "uniform-effects", "framed-views", "scene-flight", "particle-morph", "liquid-image"].map((recipe) => [recipe, "animaxxing-webgl"]),
+  ["webgl-stage", "image-planes", "uniform-effects", "framed-views", "scene-flight", "particle-morph", "liquid-image", "metaballs"].map((recipe) => [recipe, "animaxxing-webgl"]),
 );
 /** MOTION_ONLY=recipe[,recipe] builds and type-checks just those, so parallel work on one recipe cannot break another's run. */
 const only = process.env.MOTION_ONLY?.split(",").map((name) => name.trim()).filter(Boolean);
@@ -121,7 +122,7 @@ const ENTRIES = {
   vocabulary: `import * as MV from "./motion-vocabulary"; import gsap from "gsap"; Object.assign(window, { MV, gsap });`,
   print: `import * as PR from "./print-effects"; import gsap from "gsap"; Object.assign(window, { PR, gsap });`,
   typewriter: `import * as TW from "./typewriter"; import gsap from "gsap"; Object.assign(window, { TW, gsap });`,
-  "webgl-views": `import * as WS from "./webgl-stage"; import * as FV from "./framed-views"; import * as SF from "./scene-flight"; import * as PM from "./particle-morph"; import * as LI from "./liquid-image"; import gsap from "gsap"; import { ScrollTrigger } from "gsap/ScrollTrigger"; Object.assign(window, { WS, FV, SF, PM, LI, gsap, ST: ScrollTrigger });`,
+  "webgl-views": `import * as WS from "./webgl-stage"; import * as FV from "./framed-views"; import * as SF from "./scene-flight"; import * as PM from "./particle-morph"; import * as LI from "./liquid-image"; import * as MB from "./metaballs"; import gsap from "gsap"; import { ScrollTrigger } from "gsap/ScrollTrigger"; Object.assign(window, { WS, FV, SF, PM, LI, MB, gsap, ST: ScrollTrigger });`,
   webgl: `import * as WS from "./webgl-stage"; import * as IP from "./image-planes"; import * as UE from "./uniform-effects"; import gsap from "gsap"; import { ScrollTrigger } from "gsap/ScrollTrigger"; Object.assign(window, { WS, IP, UE, gsap, ST: ScrollTrigger });`,
 };
 /** Entries whose recipes were built; the original five bundle several recipes each. */
@@ -139,7 +140,7 @@ const ENTRY_RECIPES = {
   sortable: ["sortable"],
   "press-feedback": ["press-feedback", "motion-vocabulary"],
   webgl: ["webgl-stage", "image-planes", "uniform-effects"],
-  "webgl-views": ["webgl-stage", "image-planes", "framed-views", "scene-flight", "particle-morph", "liquid-image"],
+  "webgl-views": ["webgl-stage", "image-planes", "framed-views", "scene-flight", "particle-morph", "liquid-image", "metaballs"],
 };
 for (const [name, code] of Object.entries(ENTRIES)) {
   if (!ENTRY_RECIPES[name].every((recipe) => selected.includes(recipe))) continue;

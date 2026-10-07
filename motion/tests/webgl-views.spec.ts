@@ -116,6 +116,13 @@ const build = {
       w.morph = w.PM.particleMorph(document.getElementById("morph"), { shapes: [w.PM.scatterShape(1500), w.PM.sphereShape(1500, 0.6)], count: 1500, size: 4 });
       return w.morph.view.ready;
     }),
+  melt: (page: Page) =>
+    page.evaluate(() => {
+      const w = window as any;
+      const host = document.getElementById("melt")!;
+      w.metal = w.MB.melt(host, { draw: w.MB.drawText("Hi", "700 160px sans-serif"), poster: host.querySelector("h2"), drops: 10 });
+      return w.metal.view.ready;
+    }),
   liquid: (page: Page) =>
     page.evaluate(() => {
       const w = window as any;
@@ -327,7 +334,7 @@ test("without WebGL the posters are the page, and morphs and pours complete at o
     } as any;
   });
   await openViews(open, page);
-  expect(await Promise.all([build.flight(page), build.morph(page), build.liquid(page)])).toEqual([false, false, false]);
+  expect(await Promise.all([build.flight(page), build.morph(page), build.liquid(page), build.melt(page)])).toEqual([false, false, false, false]);
   expect(await canvases(page)).toBe(0);
   for (const selector of ["#flight img", "#morph img", "#liquid"]) expect(await style(page, selector)).toBe("");
   const finished = await page.evaluate(() => new Promise<boolean[]>((resolve) => {
@@ -336,12 +343,13 @@ test("without WebGL the posters are the page, and morphs and pours complete at o
     const results: boolean[] = [];
     w.morph.to(1, { duration: 3, onComplete: () => results.push(w.morph.uniforms.uShape.value === 1) });
     w.liquid.pour({ duration: 3 }).eventCallback("onComplete", () => results.push(true));
+    w.metal.form({ duration: 3 }).eventCallback("onComplete", () => results.push(true));
     gsap.delayedCall(0.2, () => {
       effects.forEach((revert: () => void) => revert());
       resolve(results);
     });
   }));
-  expect(finished).toEqual([true, true]);
+  expect(finished).toEqual([true, true, true]);
 });
 
 test("reduced motion creates no canvas and keeps every poster", async ({ open, page }) => {
@@ -361,10 +369,57 @@ test("a flight whose images cannot be read keeps its poster", async ({ open, pag
 
 test("every submitted shader uses increasing smoothstep edges", async ({ open, page }) => {
   await openViews(open, page);
-  await Promise.all([build.flight(page), build.morph(page), build.liquid(page)]);
+  await Promise.all([build.flight(page), build.morph(page), build.liquid(page), build.melt(page)]);
   const edges = await page.evaluate(() => (window as any).shaderSources.flatMap((source: string) =>
     [...source.matchAll(/smoothstep\(\s*([\d.]+)\s*,\s*([\d.]+)/g)].map((match) => [Number(match[1]), Number(match[2])])) as number[][]);
   expect(edges.length).toBeGreaterThan(2);
   for (const [low, high] of edges) expect(low).toBeLessThan(high);
-  await page.evaluate(() => ["ride", "morph", "liquid"].forEach((name) => (window as any)[name].revert()));
+  await page.evaluate(() => ["ride", "morph", "liquid", "metal"].forEach((name) => (window as any)[name].revert()));
+});
+
+
+test("a melt hides its live text, forms the shape in the element's tint, drips away, and frees everything", async ({ open, page }) => {
+  await openViews(open, page);
+  expect(await build.melt(page)).toBe(true);
+  expect(await opacity(page, "#melt h2")).toBe("0");
+  const box = () => ink(page, 560, 80, 840, 250);
+  // Before it forms there is nothing to see.
+  expect((await box()).n).toBe(0);
+  await page.evaluate(() => new Promise<void>((resolve) => {
+    (window as any).metal.form({ duration: 0.6 }).eventCallback("onComplete", () => resolve());
+  }));
+  await expect.poll(async () => (await box()).n).toBeGreaterThan(2000);
+  const formed = await box();
+  // Metal tinted by the element's color: blue light, not red.
+  expect(formed.blue).toBeGreaterThan(formed.red);
+  await page.evaluate(() => new Promise<void>((resolve) => {
+    (window as any).metal.drip({ duration: 0.5 }).eventCallback("onComplete", () => resolve());
+  }));
+  await expect.poll(async () => (await box()).n).toBeLessThan(formed.n / 10);
+  await page.evaluate(() => (window as any).metal.revert());
+  expect(await style(page, "#melt h2")).toBe("");
+  expect(await canvases(page)).toBe(0);
+  await balanced(page);
+});
+
+test("a stream pours down its column as the page scrolls and climbs back when the page returns", async ({ open, page }) => {
+  await openViews(open, page);
+  await page.evaluate(() => {
+    const w = window as any;
+    w.stream = w.MB.pourStream(document.getElementById("column"), { rows: Array.from(document.querySelectorAll("#rows li")) as HTMLElement[] });
+  });
+  await expect.poll(() => page.evaluate(() => (window as any).stream.view.live())).toBe(true);
+  const poured = async () => {
+    const top = await page.$eval("#column", (el) => el.getBoundingClientRect().top);
+    return ink(page, 460, Math.max(0, top), 500, 700);
+  };
+  // Scrolled so the column's top is high on screen, the stream reaches well down it.
+  await page.evaluate(() => window.scrollTo(0, 500));
+  await expect.poll(async () => (await poured()).n).toBeGreaterThan(1500);
+  const deep = (await poured()).n;
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect.poll(async () => (await poured()).n).toBeLessThan(deep);
+  await page.evaluate(() => (window as any).stream.revert());
+  expect(await canvases(page)).toBe(0);
+  await balanced(page);
 });
