@@ -2,8 +2,8 @@ import { test, expect, style } from "./fixture";
 
 // Recipes: split-entrances.md, route-letters.md, speak-in.md, wave.md, blast-off.md
 
-const ENTRANCES = ["charsImplodeIn", "charsRiseIn", "charsSpringIn", "charsCascadeIn", "charsFlipIn", "charsScatterIn", "wordsSlideIn", "linesMaskIn", "linesEllipseIn", "linesHighlightIn", "scrambleIn"];
-const EXITS = ["charsExplodeOut", "charsFallOut", "charsCascadeOut", "charsFlipOut", "charsScatterOut", "wordsSlideOut", "linesMaskOut", "linesEllipseOut", "linesHighlightOut", "scrambleOut"];
+const ENTRANCES = ["charsImplodeIn", "charsRiseIn", "charsSpringIn", "charsCascadeIn", "charsFlipIn", "charsScatterIn", "wordsSlideIn", "charsSlideIn", "linesMaskIn", "linesEllipseIn", "linesHighlightIn", "scrambleIn"];
+const EXITS = ["charsExplodeOut", "charsFallOut", "charsCascadeOut", "charsFlipOut", "charsScatterOut", "wordsSlideOut", "charsSlideOut", "linesMaskOut", "linesEllipseOut", "linesHighlightOut", "scrambleOut"];
 
 for (const name of [...ENTRANCES, ...EXITS, "charsWeightWave"]) {
   test(`${name} completes and restores the heading's markup`, async ({ open }) => {

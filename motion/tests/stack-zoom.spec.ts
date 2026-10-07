@@ -2,6 +2,7 @@ import { test, expect, style } from "./fixture";
 
 // Recipe: animaxxing/references/recipes/scroll-effects.md (stackCards, zoomThrough)
 
+const innerHeightOf = () => 700;
 const scrollTo = (page: import("@playwright/test").Page, y: number) => page.evaluate((top) => window.scrollTo(0, top), y);
 const top = (page: import("@playwright/test").Page, id: string) => page.$eval(`#${id}`, (el) => el.getBoundingClientRect().top);
 const scale = (page: import("@playwright/test").Page, id: string) =>
@@ -36,6 +37,32 @@ test("stackCards pins each card below the last, shrinks the buried ones, and rel
   expect(await style(page, "#c0")).toBe("");
   expect(await style(page, "#c1")).toBe("color: rgb(1, 2, 3);");
 });
+
+for (const mode of ["push", "pull"] as const) {
+  test(`zoomThrough ${mode} flies the grid so one tile fills the section, evenly, and restores it`, async ({ open }) => {
+    const page = await open("stack-zoom");
+    const before = await style(page, "#wall");
+    await page.evaluate((m) => ((window as any).z = (window as any).S.zoomThrough(document.getElementById("zoom3"), document.getElementById("tile"), { mode: m, scrub: true, length: 1 })), mode);
+    const sectionTop = await page.$eval("#zoom3", (el) => el.getBoundingClientRect().top + scrollY);
+    const tile = () => page.$eval("#tile", (el) => { const r = el.getBoundingClientRect(); return [r.width, r.height, r.left + r.width / 2, r.top + r.height / 2]; });
+    const wallScale = () => page.evaluate(() => [Number((window as any).gsap.getProperty("#wall", "scaleX")), Number((window as any).gsap.getProperty("#wall", "scaleY"))]);
+    // Filled: at the end of a push, at the start of a pull.
+    await scrollTo(page, mode === "push" ? sectionTop + innerHeightOf() : sectionTop + 1);
+    await expect.poll(async () => (await tile())[1]).toBeGreaterThan(690);
+    const [w, h, cx, cy] = await tile();
+    expect(w).toBeGreaterThanOrEqual(990);
+    expect(h).toBeGreaterThanOrEqual(690);
+    expect(Math.abs(cx! - 500)).toBeLessThan(4);
+    expect(Math.abs(cy! - 350)).toBeLessThan(4);
+    // Halfway, the two axes scale together.
+    await scrollTo(page, sectionTop + 350);
+    await page.waitForTimeout(100);
+    const [sx, sy] = await wallScale();
+    expect(sx).toBeCloseTo(sy!, 5);
+    await page.evaluate(() => (window as any).z());
+    expect(await style(page, "#wall")).toBe(before);
+  });
+}
 
 test("stackCards and zoomThrough do nothing under reduced motion", async ({ open }) => {
   const page = await open("stack-zoom");
