@@ -92,3 +92,18 @@ test("under reduced motion the list still sorts, with no lift and no slide", asy
   await page.keyboard.press("Space");
   await page.evaluate(() => (window as any).s.revert());
 });
+
+test("grab item drags a row from its name, not only its handle, and restores the row's style", async ({ open }) => {
+  const page = await open("sortable");
+  const before = await page.$eval("#a", (el) => el.getAttribute("style"));
+  await page.evaluate(() => ((window as any).s = (window as any).SR.sortable(document.getElementById("list"), { grab: "item" })));
+  const name = await page.$eval("#a [data-sortable-name]", (el) => { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+  await page.mouse.move(name.x, name.y);
+  await page.mouse.down();
+  await page.mouse.move(name.x, name.y + 30, { steps: 4 });
+  await page.mouse.move(name.x, name.y + 115, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(() => order(page)).toBe("bcad");
+  await page.evaluate(() => (window as any).s.revert());
+  expect(await page.$eval("#a", (el) => el.getAttribute("style"))).toBe(before);
+});
