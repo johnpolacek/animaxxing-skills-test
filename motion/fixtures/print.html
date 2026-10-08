@@ -8,4 +8,10 @@ h1{margin:40px;font-size:64px}
 <div id="card"><div class="art"></div><i id="roller"></i></div>
 <h1 id="title">Hand printed</h1>
 <p id="line">Pulled one sheet at a time.</p>
+<div id="book" tabindex="0" style="position:absolute;left:40px;top:400px;width:600px;height:200px;display:grid;grid-template-columns:1fr 1fr">
+<div data-page="first" style="grid-column:1">1</div>
+<div data-leaf id="leaf1" style="grid-column:2;grid-row:1;position:relative"><div data-front style="position:absolute;inset:0;background:#fff">2</div><div data-back style="position:absolute;inset:0;background:#fff">3</div></div>
+<div data-leaf id="leaf2" style="grid-column:2;grid-row:1;position:relative"><div data-front style="position:absolute;inset:0;background:#fff">4</div><div data-back style="position:absolute;inset:0;background:#fff">5</div></div>
+<div data-page="last" style="grid-column:2;grid-row:1">6</div>
+</div>
 <script src="../.build/print.js"></script></body></html>

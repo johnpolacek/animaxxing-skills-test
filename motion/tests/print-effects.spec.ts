@@ -200,3 +200,47 @@ test("under reduced motion every print effect is an empty timeline and changes n
   });
   expect(result).toEqual({ durations: [0, 0, 0, 0], canvases: 0, masks: 0, headings: 1 });
 });
+
+const leaf = (page: import("@playwright/test").Page, id: string) => page.evaluate((s) => Number((window as any).gsap.getProperty(`#${s}`, "rotationY")), id);
+
+test("pageTurn turns a leaf with the buttons and the keys, reports the spread, and turns back", async ({ open }) => {
+  const page = await open("print");
+  const before = await page.$eval("#leaf1", (e) => e.getAttribute("style"));
+  await page.evaluate(() => {
+    const w = window as any;
+    w.spreads = [];
+    w.book = w.PR.pageTurn(document.getElementById("book"), { duration: 0.3, onTurn: (s: number) => w.spreads.push(s) });
+  });
+  await page.evaluate(() => (window as any).book.next());
+  await expect.poll(() => leaf(page, "leaf1")).toBe(-180);
+  await page.focus("#book");
+  await page.keyboard.press("ArrowRight");
+  await expect.poll(() => leaf(page, "leaf2")).toBe(-180);
+  // Past the last leaf, nothing turns.
+  expect(await page.evaluate(() => (window as any).book.next())).toBe(null);
+  await page.keyboard.press("ArrowLeft");
+  await expect.poll(() => leaf(page, "leaf2")).toBe(0);
+  expect(await page.evaluate(() => (window as any).spreads)).toEqual([1, 2, 1]);
+  await page.evaluate(() => (window as any).book.revert());
+  expect(await page.$eval("#leaf1", (e) => e.getAttribute("style"))).toBe(before);
+  expect(await page.$$eval("#book i", (e) => e.length)).toBe(0);
+});
+
+test("dragging the right page across the spine turns it; a short drag lets it fall back", async ({ open, page }) => {
+  await open("print");
+  await page.evaluate(() => ((window as any).book = (window as any).PR.pageTurn(document.getElementById("book"), { duration: 0.3 })));
+  // The book: x 40 to 640, the spine at 340, y 400 to 600.
+  await page.mouse.move(620, 500);
+  await page.mouse.down();
+  await page.mouse.move(400, 500, { steps: 8 });
+  const mid = await leaf(page, "leaf1");
+  expect(mid).toBeLessThan(-30);
+  expect(mid).toBeGreaterThan(-90);
+  await page.mouse.up();
+  await expect.poll(() => leaf(page, "leaf1")).toBe(0);
+  await page.mouse.move(620, 500);
+  await page.mouse.down();
+  await page.mouse.move(200, 500, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(() => leaf(page, "leaf1")).toBe(-180);
+});

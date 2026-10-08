@@ -302,3 +302,52 @@ test("a swing follows a drag around its hook and swings on from the release", as
   await expect.poll(() => page.evaluate(() => Number((window as any).gsap.getProperty("#sign", "rotation"))), { timeout: 2000 }).toBeGreaterThan(5);
   await page.evaluate(() => (window as any).s.revert());
 });
+
+const dominoes = (page: import("@playwright/test").Page) =>
+  page.evaluate(() => {
+    const row = document.createElement("div");
+    row.id = "row";
+    row.style.cssText = "position:absolute;left:40px;top:300px;width:600px;height:120px;display:flex;align-items:flex-end;gap:34px";
+    for (let i = 0; i < 6; i++) {
+      const d = document.createElement("i");
+      d.style.cssText = "display:block;width:16px;height:100px;background:#000";
+      row.append(d);
+    }
+    document.body.append(row);
+    const w = window as any;
+    w.row = w.PH.topple(Array.from(row.children) as HTMLElement[]);
+  });
+const angles = (page: import("@playwright/test").Page) =>
+  page.$$eval("#row > i", (els) => els.map((e) => Number((window as any).gsap.getProperty(e, "rotation"))));
+
+test("topple runs a push down the row: each domino leans on the next and the last lies flat", async ({ open, page }) => {
+  await open("physics-effects");
+  await dominoes(page);
+  await page.evaluate(() => (window as any).row.push());
+  await expect.poll(async () => (await angles(page))[5]!, { timeout: 6000 }).toBe(90);
+  const rest = await angles(page);
+  // Every one before the last leans, less and less steeply back along the row: none flat, none upright.
+  for (const a of rest.slice(0, 5)) expect(a).toBeGreaterThan(10);
+  for (const a of rest.slice(0, 5)) expect(a).toBeLessThan(90);
+  // No domino passes through the next: each one's top right corner stays left of its neighbor's face.
+  const overlaps = await page.$$eval("#row > i", (els) => els.slice(0, -1).map((e, i) => {
+    const a = e.getBoundingClientRect();
+    const b = els[i + 1]!.getBoundingClientRect();
+    return a.right - b.right;
+  }));
+  for (const o of overlaps) expect(o).toBeLessThan(1);
+  await page.evaluate(() => (window as any).row.reset());
+  await expect.poll(async () => (await angles(page)).every((a) => Math.abs(a) < 0.5)).toBe(true);
+  await page.evaluate(() => (window as any).row.revert());
+  expect(await page.$$eval("#row > i", (els) => els.map((e) => e.style.transform))).toEqual(["", "", "", "", "", ""]);
+});
+
+test("topple under reduced motion lays the row down at once", async ({ open, page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await open("physics-effects");
+  await dominoes(page);
+  await page.evaluate(() => (window as any).row.push());
+  const now = await angles(page);
+  expect(now[5]).toBe(90);
+  expect(now[0]).toBeGreaterThan(10);
+});
