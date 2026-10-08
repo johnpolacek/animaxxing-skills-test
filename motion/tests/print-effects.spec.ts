@@ -118,10 +118,11 @@ test("writeOn masks live text with one stroke per line, writes them in order, an
     return { lines: paths.length, start, mid, masked, after: title.style.getPropertyValue("mask"), masks: document.querySelectorAll("mask").length };
   });
   expect(run.lines).toBeGreaterThan(1);
-  expect(run.start.every((o) => o === 1)).toBe(true);
+  // Every stroke parked past its line's end, so nothing shows yet.
+  expect(run.start.every((o) => o > 1 && o === run.start[0])).toBe(true);
   // The first line is being written before the last has begun.
   expect(run.mid[0]).toBeLessThan(1);
-  expect(run.mid[run.mid.length - 1]).toBe(1);
+  expect(run.mid[run.mid.length - 1]).toBe(run.start[0]);
   expect(run.masked).toMatch(/write-on-/);
   expect(run.after).toBe("");
   expect(run.masks).toBe(0);
@@ -243,4 +244,25 @@ test("dragging the right page across the spine turns it; a short drag lets it fa
   await page.mouse.move(200, 500, { steps: 8 });
   await page.mouse.up();
   await expect.poll(() => leaf(page, "leaf1")).toBe(-180);
+});
+
+test("writeOn paused at its start shows nothing of the text, not even the line ends", async ({ open }) => {
+  const page = await open("print");
+  // Narrow, so its lines run to the box's right edge, where a parked stroke's cap would sit.
+  await page.evaluate(() => Object.assign(document.getElementById("line")!.style, { width: "150px", textAlign: "justify", fontSize: "24px" }));
+  const clip = (await page.locator("#line").boundingBox())!;
+  const shot = () => page.screenshot({ clip });
+  // The same box with the text hidden: what "nothing yet" looks like.
+  await page.evaluate(() => (document.getElementById("line")!.style.visibility = "hidden"));
+  const blank = await shot();
+  await page.evaluate(() => {
+    const el = document.getElementById("line")!;
+    el.style.visibility = "";
+    const w = window as any;
+    w.write = w.PR.writeOn(el, { duration: 0.6 });
+    w.write.timeline.pause(0);
+  });
+  await page.waitForTimeout(50);
+  expect((await shot()).equals(blank)).toBe(true);
+  await page.evaluate(() => (window as any).write.revert());
 });
