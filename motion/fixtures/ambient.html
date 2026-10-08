@@ -1,0 +1,18 @@
+<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>
+body{margin:0;font:16px sans-serif}
+#dot{display:inline-block;width:12px;height:12px;border-radius:50%;background:#c00;color:#c00;margin:40px}
+#like,#badge{display:inline-block;margin:20px;padding:8px}
+#badge{font-variant-numeric:tabular-nums;min-width:2ch}
+#field{position:relative;width:400px;height:300px;background:#eee}
+#field i{position:absolute;left:0;top:0;width:20px;height:20px;background:#333}
+#orbit{position:relative;width:300px;height:300px}
+#orbit b{position:absolute;left:140px;top:140px;width:20px;height:20px;background:#00c}
+.shape{display:inline-block;width:40px;height:40px;background:#0a0;margin:10px}
+#below{margin-top:3000px}
+</style></head><body>
+<div id="shapes"><span class="shape"></span><span class="shape"></span></div><button id="pause">Pause</button>
+<span id="dot"></span><button id="like">Like</button><span id="badge">3</span>
+<div id="field"><i></i><i></i><i></i></div>
+<div id="orbit"><b></b><b></b><b></b><b></b></div>
+<div id="below"><span class="shape" id="far"></span></div>
+<script src="../.build/ambient.js"></script></body></html>
