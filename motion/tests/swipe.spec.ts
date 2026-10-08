@@ -105,3 +105,44 @@ test("a vertical touch swipe is left to the page, and reduced motion dismisses a
   await page.evaluate(() => (window as any).s.revert());
   expect(await page.$eval("#n1", (el) => getComputedStyle(el).display)).toBe("flex");
 });
+
+test("tilt leans with the drag, shows the label for that side, flings off turning, and reverts", async ({ open }) => {
+  const page = await open("swipe");
+  const before = await declarations(page, "#n3");
+  await page.evaluate(() => ((window as any).s = (window as any).P.swipeDismiss(document.getElementById("n3"), { look: "tilt" })));
+  // n3: y 160 to 210.
+  await page.mouse.move(100, 185);
+  await page.mouse.down();
+  await page.mouse.move(200, 185, { steps: 10 });
+  const mid = await page.evaluate(() => ({
+    rotation: Number((window as any).gsap.getProperty("#n3", "rotation")),
+    keep: Number(getComputedStyle(document.getElementById("keep")!).opacity),
+    toss: Number(getComputedStyle(document.getElementById("toss")!).opacity),
+  }));
+  expect(mid.rotation).toBeGreaterThan(1);
+  expect(mid.keep).toBeGreaterThan(0.3);
+  expect(mid.toss).toBe(0);
+  await page.mouse.move(330, 185, { steps: 10 });
+  await page.waitForTimeout(150);
+  await page.mouse.up();
+  await expect.poll(() => page.$eval("#n3", (el) => getComputedStyle(el).display)).toBe("none");
+  await page.evaluate(() => (window as any).s.revert());
+  expect(await declarations(page, "#n3")).toEqual(before);
+  expect(await page.$$eval("[data-swipe-label]", (els) => els.map((e) => e.getAttribute("style") ?? ""))).toEqual(["", ""]);
+});
+
+test("fold folds the item away from its top edge, then closes the gap", async ({ open }) => {
+  const page = await open("swipe");
+  const result = await page.evaluate(() => new Promise<{ mid: number; gone: string[] }>((done) => {
+    const w = window as any;
+    const gone: string[] = [];
+    const s = w.P.swipeDismiss(document.getElementById("n1"), { look: "fold", onDismiss: (el: HTMLElement) => gone.push(el.id) });
+    s.dismiss(1);
+    setTimeout(() => {
+      const mid = Number(w.gsap.getProperty("#n1", "rotationX"));
+      setTimeout(() => done({ mid, gone }), 500);
+    }, 150);
+  }));
+  expect(result.mid).toBeLessThan(-10);
+  expect(result.gone).toEqual(["n1"]);
+});

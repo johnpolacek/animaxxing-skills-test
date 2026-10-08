@@ -237,3 +237,68 @@ test("the slingshot keeps its handle inside the box however far it is pulled", a
   expect(box.left).toBeGreaterThanOrEqual(-0.5);
   expect(box.bottom).toBeLessThanOrEqual(500.5);
 });
+
+test("pegs turn a falling piece aside, and bin walls keep it in its bin", async ({ open, page }) => {
+  await open("physics-effects");
+  const result = await page.evaluate(async () => {
+    const w = window as any;
+    const box = document.createElement("div");
+    box.style.cssText = "position:absolute;left:0;top:0;width:300px;height:400px";
+    document.body.append(box);
+    const ball = document.createElement("span");
+    ball.style.cssText = "position:absolute;left:0;top:0;width:16px;height:16px";
+    // One peg just right of the drop line, inside a bin whose walls, at 100 and 200, rise above it.
+    const heap = w.PH.pile(box, { pieces: [ball], bounce: 0.5, pegs: () => [{ x: 154, y: 150, r: 8 }], walls: () => [100, 200], wallHeight: 330 });
+    heap.launch(150, 20, 0, 0);
+    const xs: number[] = [];
+    for (let i = 0; i < 60; i++) { await new Promise((r) => setTimeout(r, 25)); const r = box.querySelector("span")!.getBoundingClientRect(); xs.push(r.left + r.width / 2); }
+    heap.stop();
+    return { early: xs[2]!, low: Math.min(...xs), last: xs[xs.length - 1]! };
+  });
+  // Struck on its right, it is turned left into the wall, rebounds, and stays in the middle bin.
+  expect(result.low).toBeLessThan(result.early - 20);
+  expect(result.last).toBeGreaterThan(100);
+  expect(result.last).toBeLessThan(200);
+});
+
+test("a swing pushed swings both ways, settles straight, and reverts clean", async ({ open, page }) => {
+  await open("physics-effects");
+  const result = await page.evaluate(async () => {
+    const w = window as any;
+    const sign = document.createElement("button");
+    sign.id = "sign";
+    sign.style.cssText = "position:absolute;left:300px;top:100px;width:120px;height:80px";
+    document.body.append(sign);
+    const s = w.PH.swing(sign, { damping: 0.05 });
+    s.push(200);
+    const angles: number[] = [];
+    for (let i = 0; i < 80; i++) { await new Promise((r) => setTimeout(r, 30)); angles.push(Number(w.gsap.getProperty(sign, "rotation"))); }
+    const settled = angles[angles.length - 1]!;
+    s.revert();
+    return { max: Math.max(...angles), min: Math.min(...angles), settled, style: sign.getAttribute("style") };
+  });
+  expect(result.max).toBeGreaterThan(5);
+  expect(result.min).toBeLessThan(-1);
+  expect(Math.abs(result.settled)).toBeLessThan(0.5);
+  expect(result.style).not.toContain("rotate");
+});
+
+test("a swing follows a drag around its hook and swings on from the release", async ({ open, page }) => {
+  await open("physics-effects");
+  await page.evaluate(() => {
+    const sign = document.createElement("button");
+    sign.id = "sign";
+    sign.style.cssText = "position:absolute;left:300px;top:100px;width:120px;height:80px";
+    document.body.append(sign);
+    (window as any).s = (window as any).PH.swing(sign);
+  });
+  // The hook is at (360, 100). Drag the sign's bottom out to the right.
+  await page.mouse.move(360, 170);
+  await page.mouse.down();
+  await page.mouse.move(420, 160, { steps: 8 });
+  const held = await page.evaluate(() => Number((window as any).gsap.getProperty("#sign", "rotation")));
+  expect(held).toBeLessThan(-20);
+  await page.mouse.up();
+  await expect.poll(() => page.evaluate(() => Number((window as any).gsap.getProperty("#sign", "rotation"))), { timeout: 2000 }).toBeGreaterThan(5);
+  await page.evaluate(() => (window as any).s.revert());
+});
