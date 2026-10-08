@@ -432,3 +432,21 @@ for (const reduced of [false, true]) {
     expect(await page.getAttribute("html", "data-scroll-direction")).toBeNull();
   });
 }
+
+test("a statement near the page's end finishes reading at the bottom of the scroll", async ({ open }) => {
+  const page = await open("scroll-effects");
+  await page.evaluate(() => {
+    // A last line just above the page's end: its bottom can never rise to 45% of the viewport.
+    const last = document.createElement("p");
+    last.id = "lastline";
+    last.textContent = "The last words on the page.";
+    last.style.cssText = "margin:0;padding:0 0 40px";
+    document.body.append(last);
+    (window as any).t = (window as any).S.scrubStatement(last, { scrub: true });
+  });
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await expect
+    .poll(() => page.$$eval("#lastline [aria-hidden] > *, #lastline > div", (els) => Math.min(...els.map((e) => Number(getComputedStyle(e).opacity)))))
+    .toBe(1);
+  await page.evaluate(() => (window as any).t());
+});
