@@ -147,3 +147,93 @@ test("pile under reduced motion drops nothing", async ({ open }) => {
   });
   expect(n).toBe(0);
 });
+
+const sling = async (page: import("@playwright/test").Page) => {
+  await page.evaluate(() => {
+    const box = document.createElement("div");
+    box.id = "range";
+    box.style.cssText = "position:absolute;left:0;top:0;width:800px;height:500px;overflow:hidden;color:#000";
+    const handle = document.createElement("button");
+    handle.id = "handle";
+    handle.textContent = "Aim";
+    handle.style.cssText = "position:absolute;left:100px;top:380px;width:40px;height:40px";
+    box.append(handle);
+    document.body.append(box);
+    const w = window as any;
+    const ball = document.createElement("span");
+    ball.style.cssText = "position:absolute;left:0;top:0;width:24px;height:24px;border-radius:50%;background:#c00";
+    w.heap = w.PH.pile(box, { pieces: [ball], bounce: 0.6 });
+    w.shots = 0;
+    w.stopSling = w.PH.slingshot(box, handle, w.heap, { onLaunch: () => w.shots++ });
+  });
+};
+const balls = (page: import("@playwright/test").Page) =>
+  page.$$eval("#range > span", (els) => els.map((e) => { const r = e.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }));
+
+test("a slingshot shows the arc while pulled, flings a piece the opposite way, and springs back", async ({ open, page }) => {
+  await open("physics-effects");
+  await sling(page);
+  await page.mouse.move(120, 400);
+  await page.mouse.down();
+  await page.mouse.move(40, 460, { steps: 6 });
+  const dots = await page.$$eval("#range > i", (els) => els.filter((e) => Number(getComputedStyle(e).opacity) > 0).map((e) => new DOMMatrix(getComputedStyle(e).transform).m41));
+  // The arc runs forward, up and to the right, opposite the pull.
+  expect(dots.length).toBeGreaterThan(5);
+  expect(dots[dots.length - 1]!).toBeGreaterThan(dots[0]!);
+  await page.mouse.up();
+  await page.waitForTimeout(120);
+  const [first] = await balls(page);
+  await page.waitForTimeout(200);
+  const [later] = await balls(page);
+  expect(await page.evaluate(() => (window as any).shots)).toBe(1);
+  expect(later![0]).toBeGreaterThan(first![0] + 20);
+  await expect.poll(() => page.$eval("#handle", (h) => new DOMMatrix(getComputedStyle(h).transform).m41)).toBeCloseTo(0, 0);
+});
+
+test("the keyboard aims and fires; a tap without a pull fires nothing; teardown cleans up", async ({ open, page }) => {
+  await open("physics-effects");
+  await sling(page);
+  await page.mouse.click(120, 400);
+  expect(await page.evaluate(() => (window as any).shots)).toBe(0);
+  await page.focus("#handle");
+  await page.keyboard.press("ArrowUp");
+  await page.keyboard.press("Enter");
+  expect(await page.evaluate(() => (window as any).shots)).toBe(1);
+  expect((await balls(page)).length).toBe(1);
+  await page.evaluate(() => { (window as any).stopSling(); (window as any).heap.stop(); });
+  expect(await page.$$eval("#range > i, #range > span", (e) => e.length)).toBe(0);
+  expect(await page.$eval("#handle", (h) => [h.style.transform, h.style.touchAction])).toEqual(["", ""]);
+});
+
+test("a pile with a ceiling keeps thrown pieces inside the box", async ({ open, page }) => {
+  await open("physics-effects");
+  const tops = await page.evaluate(async () => {
+    const w = window as any;
+    const box = document.createElement("div");
+    box.style.cssText = "position:absolute;left:0;top:200px;width:400px;height:300px";
+    document.body.append(box);
+    const ball = document.createElement("span");
+    ball.style.cssText = "position:absolute;left:0;top:0;width:20px;height:20px";
+    const heap = w.PH.pile(box, { pieces: [ball], bounce: 0.8, ceiling: true });
+    heap.launch(200, 150, 0, -3000);
+    const out: number[] = [];
+    // The piece spins as it flies, so read its center, not its box.
+    for (let i = 0; i < 20; i++) { await new Promise((r) => setTimeout(r, 30)); const r = box.querySelector("span")!.getBoundingClientRect(); out.push(r.top + r.height / 2); }
+    heap.stop();
+    return out;
+  });
+  // The box's top is at 200 and the piece's radius is 10: its center never rises above 210.
+  expect(Math.min(...tops)).toBeGreaterThanOrEqual(209);
+});
+
+test("the slingshot keeps its handle inside the box however far it is pulled", async ({ open, page }) => {
+  await open("physics-effects");
+  await sling(page);
+  await page.mouse.move(120, 400);
+  await page.mouse.down();
+  await page.mouse.move(-200, 700, { steps: 6 });
+  const box = await page.$eval("#handle", (h) => h.getBoundingClientRect().toJSON());
+  await page.mouse.up();
+  expect(box.left).toBeGreaterThanOrEqual(-0.5);
+  expect(box.bottom).toBeLessThanOrEqual(500.5);
+});
