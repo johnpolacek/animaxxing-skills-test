@@ -786,3 +786,43 @@ test("acc restores authored CSS priorities", async ({ open }) => {
   });
   expect(result.after).toEqual(result.before);
 });
+
+test("a stretching indicator spans both tabs mid-move, then lands exactly on the new one", async ({ open }) => {
+  const page = await open("component-motion");
+  const result = await page.evaluate(() => {
+    const w = window as any;
+    const ind = document.getElementById("ind")!;
+    const ti = w.CM.tabIndicator(ind, document.getElementById("tabs"), { duration: 1, stretch: true });
+    const t1 = document.getElementById("t1")!.getBoundingClientRect();
+    const t3 = document.getElementById("t3")!.getBoundingClientRect();
+    const tl = ti.moveTo(document.getElementById("t3"));
+    tl.pause(0.55);
+    const mid = ind.getBoundingClientRect();
+    tl.progress(1);
+    const end = ind.getBoundingClientRect();
+    ti.revert();
+    return { t1: [t1.left, t1.right], t3: [t3.left, t3.right], mid: [mid.left, mid.right], end: [end.left, end.right] };
+  });
+  expect(result.mid[0]).toBeCloseTo(result.t1[0], 0);
+  expect(result.mid[1]).toBeCloseTo(result.t3[1], 0);
+  expect(result.end[0]).toBeCloseTo(result.t3[0], 0);
+  expect(result.end[1]).toBeCloseTo(result.t3[1], 0);
+});
+
+test("panelSwap slides the old panel out and the new one in from the side of travel, then clears", async ({ open }) => {
+  const page = await open("component-motion");
+  const result = await page.evaluate(() => {
+    const w = window as any;
+    const [a, b] = [document.getElementById("pa")!, document.getElementById("pb")!];
+    const tl = w.CM.panelSwap(a, b, 1, { distance: 40, duration: 0.4 });
+    // Before the new panel starts: it waits on the far side while the old one leaves.
+    tl.pause(0.15);
+    const mid = { a: Number(w.gsap.getProperty(a, "x")), b: Number(w.gsap.getProperty(b, "x")) };
+    tl.progress(1);
+    return { mid, a: getComputedStyle(a).visibility, b: getComputedStyle(b).visibility, styles: [a.style.transform, b.style.transform] };
+  });
+  expect(result.mid.a).toBeLessThan(0);
+  expect(result.mid.b).toBe(40);
+  expect([result.a, result.b]).toEqual(["hidden", "visible"]);
+  expect(result.styles).toEqual(["", ""]);
+});

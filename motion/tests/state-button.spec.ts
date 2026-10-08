@@ -116,3 +116,31 @@ test("under reduced motion nothing spins or shakes and the status still announce
   });
   expect(result).toEqual({ rotation: 0, x: 0, message: "Nope" });
 });
+
+test("success pops the button and bursts sparks that remove themselves; error draws a cross", async ({ open }) => {
+  const page = await open("component-motion");
+  const result = await page.evaluate(async () => {
+    const w = window as any;
+    const button = document.getElementById("send")!;
+    const sb = w.CM.stateButton(button, { hold: 0.2 });
+    sb.loading();
+    const tl = sb.success("Sent");
+    tl.pause(tl.duration() - 0.2 - 0.35 - 0.3);
+    const sparks = button.querySelectorAll("[data-state-spark]").length;
+    tl.progress(1);
+    const after = button.querySelectorAll("[data-state-spark]").length;
+    sb.loading();
+    const err = sb.error("No");
+    err.pause(0.5);
+    const paths = [...button.querySelectorAll("svg path")].map((p) => Number(p.getAttribute("stroke-dashoffset")));
+    err.progress(1);
+    const rest = { x: Number(w.gsap.getProperty(button, "x")), rotation: Number(w.gsap.getProperty(button, "rotation")) };
+    sb.revert();
+    return { sparks, after, paths, rest, left: button.querySelectorAll("[data-state-spark], svg").length };
+  });
+  expect(result.sparks).toBe(8);
+  expect(result.after).toBe(0);
+  expect(result.paths).toEqual([0, 0]);
+  expect(result.rest).toEqual({ x: 0, rotation: 0 });
+  expect(result.left).toBe(0);
+});
